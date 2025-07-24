@@ -16,7 +16,7 @@ import axios from 'axios';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 
-const GROQ_API_KEY = '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';
+const GROQ_API_KEY = 'YOUR_GROQ_API';
 
 const ChatBot = ({ navigation, route }) => {
   const [messages, setMessages] = useState([]);
