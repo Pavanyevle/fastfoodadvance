@@ -1,0 +1,721 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  Animated,
+} from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import LinearGradient from 'react-native-linear-gradient';
+import axios from 'axios';
+
+const EmptyCartIllustration = () => (
+  <View style={{ alignItems: 'center', marginTop: 40 }}>
+    <Text style={{ fontSize: 60 }}>🛒</Text>
+    <Text style={{ fontSize: 18, color: '#667eea', marginTop: 10 }}>Your cart is empty!</Text>
+  </View>
+);
+
+const OrderScreen = ({ navigation, route }) => {
+  const [deliveryAddress, setDeliveryAddress] = useState('Home');
+  const [deliveryTime, setDeliveryTime] = useState('30-35 min');
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [scaleAnim] = useState(new Animated.Value(1));
+  const { id, username, address } = route.params;
+
+  const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com';
+
+  useEffect(
+
+
+    
+    useCallback(() => {
+      const fetchCartItems = async () => {
+        try {
+          const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+          if (res.data) {
+            const foodIds = Object.values(res.data).map(item => item.foodId);
+            const foodDetailsPromises = foodIds.map(id =>
+              axios.get(`${FIREBASE_DB_URL}/foods/${id}.json`).then(res => {
+                const price = parseInt(res.data.price);
+                return {
+                  ...res.data,
+                  id,
+                  price,
+                  quantity: 1,
+                  total: `₹${price}`,
+                };
+              })
+            );
+            const foodDetails = await Promise.all(foodDetailsPromises);
+            setCartItems(foodDetails);
+          } else {
+            setCartItems([]);
+          }
+        } catch (error) {
+          console.error("Error fetching cart items:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+       const fetchUserAddress = async () => {
+    try {
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+      );
+      if (res.data && res.data.address) {
+        setAddress(res.data.address);  // ✅ address state update
+      }
+    } catch (err) {
+      console.error('Error fetching user address:', err);
+    }
+  };
+
+   fetchUserAddress();
+      fetchCartItems();
+    }, [])
+  );
+
+  const handleDeleteItem = async (itemId) => {
+    setDeleting(true);
+    try {
+      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+      if (res.data) {
+        const keyToDelete = Object.keys(res.data).find(
+          key => res.data[key].foodId === itemId
+        );
+        if (keyToDelete) {
+          await axios.delete(`${FIREBASE_DB_URL}/users/${username}/cart/${keyToDelete}.json`);
+          setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+        } else {
+          console.warn("Item key not found in cart.");
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    } finally {
+      setDeleting(false);
+      setDeleteModalVisible(false);
+    }
+  };
+
+  const confirmDeleteItem = (itemId) => {
+    setItemToDelete(itemId);
+    setDeleteModalVisible(true);
+  };
+
+  const handleQuantityChange = (itemId, change) => {
+    setCartItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          const newQuantity = Math.max(1, item.quantity + change);
+          const updatedTotal = item.price * newQuantity;
+          return {
+            ...item,
+            quantity: newQuantity,
+            total: `₹${updatedTotal}`,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const deliveryAddresses = [
+    { id: '1', name: 'Home', address: address, selected: true },
+  ];
+
+  const subtotal = cartItems.reduce((sum, item) => sum + parseInt(item.total.replace('₹', '')), 0);
+  const deliveryFee = 30;
+  const tax = Math.round(subtotal * 0.05);
+  const total = subtotal + deliveryFee + tax;
+
+  const renderCartItem = ({ item }) => (
+    <View style={styles.cartItem}>
+      <View style={styles.cartItemBorder} />
+      <Image source={{ uri: item.image }} style={styles.itemImage} />
+      <View style={styles.itemContent}>
+        <View style={styles.itemHeader}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          <TouchableOpacity style={styles.removeBtn} onPress={() => confirmDeleteItem(item.id)}>
+            <Ionicons name="trash-outline" size={20} color="#ff4757" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.itemDescription}>{item.description}</Text>
+        <View style={styles.itemFooter}>
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity style={styles.quantityBtn} onPress={() => handleQuantityChange(item.id, -1)}>
+              <Ionicons name="remove" size={16} color="#667eea" />
+            </TouchableOpacity>
+            <Text style={styles.quantityText}>{item.quantity}</Text>
+            <TouchableOpacity style={styles.quantityBtn} onPress={() => handleQuantityChange(item.id, 1)}>
+              <Ionicons name="add" size={16} color="#667eea" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.itemTotal}>{item.total}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const handlePlaceOrder = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      const itemIds = cartItems.map(item => item.id);
+      navigation.navigate('PaymentScreen', {
+        totalItems: cartItems.length,
+        totalPrice: total,
+        itemIds: itemIds,
+        username: username,
+        address: address,
+      });
+    });
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>Your Order</Text>
+            <Text style={styles.headerSubtitle}>Review and place your order</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 }}>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={{ marginTop: 10, fontSize: 16, color: '#667eea' }}>
+            Loading your cart...
+          </Text>
+        </View>
+      ) : cartItems.length === 0 ? (
+        <EmptyCartIllustration />
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cart Items</Text>
+            <FlatList
+              data={cartItems}
+              renderItem={renderCartItem}
+              keyExtractor={item => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={styles.cartList}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Delivery Address</Text>
+            {deliveryAddresses.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.deliveryAddress, deliveryAddress === item.name && styles.selectedAddress]}
+                onPress={() => setDeliveryAddress(item.name)}
+              >
+                <View style={styles.addressContent}>
+                  <View style={styles.addressHeader}>
+                    <Ionicons name="location" size={20} color="#667eea" />
+                    <Text style={styles.addressName}>{item.name}</Text>
+                  </View>
+                  <Text style={styles.addressText}>{item.address}</Text>
+                </View>
+                {deliveryAddress === item.name && (
+                  <Ionicons name="checkmark-circle" size={24} color="#667eea" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Order Summary</Text>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>₹{subtotal}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Delivery Fee</Text>
+                <Text style={styles.summaryValue}>₹{deliveryFee}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tax (5%)</Text>
+                <Text style={styles.summaryValue}>₹{tax}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>₹{total}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.deliveryInfoCard}>
+              <View style={styles.deliveryInfoRow}>
+                <Ionicons name="time-outline" size={20} color="#667eea" />
+                <Text style={styles.deliveryInfoText}>Estimated Delivery: {deliveryTime}</Text>
+              </View>
+              <View style={styles.deliveryInfoRow}>
+                <Ionicons name="location-outline" size={20} color="#667eea" />
+                <Text style={styles.deliveryInfoText}>Delivery to: {deliveryAddress}</Text>
+
+              </View>
+
+            </View>
+            <View style={styles.section}>
+              <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder} activeOpacity={0.8}>
+                <LinearGradient colors={['#667eea', '#764ba2']} style={styles.placeOrderGradient}>
+                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                  <Text style={styles.placeOrderText}>Place Order - ₹{total}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      )}
+
+      <View style={styles.bottomContainer}>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+
+        </Animated.View>
+      </View>
+
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Remove Item?</Text>
+            {deleting ? (
+              <ActivityIndicator size="large" color="#667eea" />
+            ) : (
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => handleDeleteItem(itemToDelete)}
+                >
+                  <Text style={styles.modalBtnText}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => setDeleteModalVisible(false)}
+                >
+                  <Text style={styles.modalBtnText}>No</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+export default OrderScreen;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 10,
+    borderRadius: 20,
+  },
+  headerInfo: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+  },
+  cartBtn: {
+    position: 'relative',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 10,
+    borderRadius: 20,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  cartList: {
+    paddingHorizontal: 20,
+  },
+  cartItem: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    position: 'relative',
+  },
+  cartItemBorder: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+    borderTopLeftRadius: 15,
+    borderBottomLeftRadius: 15,
+    backgroundColor: '#667eea',
+    zIndex: 1,
+  },
+  itemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    marginRight: 15,
+    zIndex: 2,
+  },
+  itemContent: {
+    flex: 1,
+    zIndex: 2,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    flex: 1,
+  },
+  removeBtn: {
+    padding: 5,
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: '#636e72',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  itemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityBtn: {
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 15,
+    marginHorizontal: 5,
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginHorizontal: 10,
+  },
+  itemTotal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+  addressList: {
+    paddingHorizontal: 20,
+  },
+  deliveryAddress: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 15,
+    marginLeft: 20,
+    marginRight: 20,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  selectedAddress: {
+    borderWidth: 2,
+    borderColor: '#667eea',
+  },
+  addressContent: {
+    flex: 1,
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  addressName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginLeft: 8,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#636e72',
+    marginLeft: 28,
+  },
+  paymentList: {
+    paddingHorizontal: 20,
+  },
+  paymentMethod: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  selectedPayment: {
+    backgroundColor: '#667eea',
+  },
+  paymentText: {
+    fontSize: 16,
+    color: '#2d3436',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  selectedPaymentText: {
+    color: '#fff',
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#636e72',
+  },
+  summaryValue: {
+    fontSize: 16,
+    color: '#2d3436',
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e9ecef',
+    marginVertical: 10,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2d3436',
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+  deliveryInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  deliveryInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  deliveryInfoText: {
+    fontSize: 14,
+    color: '#636e72',
+    marginLeft: 10,
+  },
+  bottomContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  placeOrderBtn: {
+    borderRadius: 15,
+    overflow: 'hidden',
+    margin: 20,
+    marginBottom: 40,
+
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  placeOrderGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+  },
+  placeOrderText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    backgroundColor: '#fff',
+    width: '80%',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginVertical: 20,
+    textAlign: 'center',
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    marginHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#667eea',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

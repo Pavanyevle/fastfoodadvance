@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "195599893710",
+    "project_id": "fooddeliveryapp-395e7",
+    "storage_bucket": "fooddeliveryapp-395e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:195599893710:android:f346cb546657b286aebc9f",
+        "android_client_info": {
+          "package_name": "com.speedybite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMDj03oJrRv_S0IaTPUbKUU2EqaOdN7ds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

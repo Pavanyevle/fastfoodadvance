@@ -1,0 +1,227 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  StatusBar,
+} from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import axios from 'axios';
+import moment from 'moment';
+
+
+
+const NotificationScreen = ({ navigation, route }) => {
+  const { username, address } = route.params;
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+
+const handleNotificationPress = async (item) => {
+  // Update isRead to true in Firebase
+  try {
+    await axios.patch(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications/${item.id}.json`,
+      {
+        isRead: true,
+      }
+    );
+    // Refresh notifications list
+    fetchNotifications();
+  } catch (error) {
+    console.error('Error updating notification:', error.message);
+  }
+};
+
+  const fetchNotifications = async () => {
+  try {
+    setLoading(true); // Start loader
+
+    const res = await axios.get(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`
+    );
+
+    const data = res.data;
+
+    if (data) {
+      const parsed = Object.keys(data).map((key) => ({
+        id: key,
+        ...data[key],
+      }));
+
+      const sorted = parsed.sort((a, b) => new Date(b.time) - new Date(a.time));
+      setNotifications(sorted);
+    } else {
+      setNotifications([]);
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error.message);
+  } finally {
+    setLoading(false); // Stop loader
+  }
+};
+
+  const getIndianTimeISOString = () => {
+  const now = new Date();
+
+  // IST = UTC + 5.5 hours
+  const istOffset = 7.5 * 60 * 60 * 1000; // milliseconds
+  const istDate = new Date(now.getTime() + istOffset);
+
+  return istDate.toISOString(); // eg: "2025-07-21T19:40:00.000Z"
+};
+
+ useEffect(() => {
+  fetchNotifications(); // Load only once when screen opens
+}, []);
+
+ const renderNotification = ({ item }) => (
+  <TouchableOpacity
+    style={[
+      styles.card,
+      { backgroundColor: item.isRead ? '#e9ecef' : '#ffffff' }, // Read: light grey, Unread: white
+    ]}
+    activeOpacity={0.8}
+    onPress={() => handleNotificationPress(item)}
+  >
+    <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
+      <Ionicons name={item.icon} size={28} color="#fff" />
+    </View>
+    <View style={styles.textContent}>
+      <Text
+        style={[
+          styles.title,
+          { fontWeight: item.isRead ? 'normal' : 'bold' }, // Bold if unread
+        ]}
+      >
+        {item.title}
+      </Text>
+      <Text style={styles.message}>{item.message}</Text>
+      <Text style={styles.time}>
+        {moment(item.time, moment.ISO_8601, true).isValid()
+          ? moment(item.time).fromNow()
+          : 'Unknown time'}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
+        <View style={{ width: 24 }} /> {/* for spacing balance */}
+      </View>
+
+       {loading ? (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#667eea" />
+
+        <Text style={{ fontSize: 16, color: '#667eea', marginBottom: 10 }}>Loading Notifications...</Text>
+        <StatusBar barStyle="dark-content" />
+      </View>
+    ) : (
+      <FlatList
+        data={notifications}
+        keyExtractor={(item) => item.id}
+        renderItem={renderNotification}
+        contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+        showsVerticalScrollIndicator={false}
+      />
+    )}
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    backgroundColor: '#667eea',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+      paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 10,
+    paddingRight: 20
+  },
+  headerText: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  username: {
+    fontSize: 14,
+    color: '#ddd',
+    fontWeight: '500',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 2,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  textContent: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginBottom: 2,
+  },
+  message: {
+    fontSize: 14,
+    color: '#636e72',
+    marginBottom: 6,
+  },
+  time: {
+    fontSize: 12,
+    color: '#b2bec3',
+  },
+});
+
+export default NotificationScreen;

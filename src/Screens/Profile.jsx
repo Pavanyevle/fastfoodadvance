@@ -1,0 +1,450 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  StatusBar,
+  Modal,
+} from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
+
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
+import axios from 'axios';
+
+const ProfileScreen = ({ navigation, route }) => {
+  const isFocused = useIsFocused();
+
+  const { username } = route.params;
+  const { address } = route.params;
+  const [imageUrl, setImageUrl] = useState('');
+
+
+  const [dbEmail, setDbEmail] = useState('');
+  const name = username || 'User';
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  const [selectedImage, setSelectedImage] = useState('');
+  const [profileData, setProfileData] = useState({});
+
+
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const fetchEmail = async () => {
+    try {
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+      );
+      if (res.data) {
+        setDbEmail(res.data.email || 'No email');
+        setImageUrl(res.data.image || ''); 
+        setProfileData(res.data);
+      } else {
+        setDbEmail('No email found');
+        setImageUrl('');
+      }
+    } catch (err) {
+      console.log('Error fetching email/image:', err);
+      setDbEmail('Error fetching email');
+      setImageUrl('');
+    }
+  };
+  const fetchNotificationCount = async () => {
+    try {
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`
+      );
+      const data = res.data;
+
+      if (data) {
+        
+        const unreadNotifications = Object.values(data).filter(
+          n => typeof n.isRead !== 'undefined' && n.isRead === false
+        );
+
+        const count = unreadNotifications.length;
+        setNotificationCount(count);
+      } else {
+        setNotificationCount(0);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching notification count from DB:', err);
+      setNotificationCount(0);
+    }
+  };
+
+
+
+  useEffect(() => {
+    let interval;
+    if (isFocused) {
+      fetchEmail();
+      fetchNotificationCount();
+      interval = setInterval(fetchNotificationCount, 1000);
+    }
+
+    return () => {
+      clearInterval(interval); 
+    };
+  }, [isFocused]); 
+
+
+
+
+
+  const handleSignOut = async () => {
+    try {
+      await AsyncStorage.removeItem('username');
+      await AsyncStorage.removeItem('address');
+      navigation.replace('Welcome');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  const ProfileItem = ({ icon, text, bg, onPress, badge }) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+      <LinearGradient colors={[bg, bg + 'CC']} style={styles.menuItemGradient}>
+        <View style={styles.menuItemContent}>
+          <View style={styles.iconContainer}>
+            <FontAwesome name={icon} size={22} color="#fff" />
+          </View>
+          <View style={styles.menuItemTextContainer}>
+            <Text style={styles.menuItemText}>{text}</Text>
+            {badge && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badge}</Text>
+              </View>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#4F46E5" barStyle="light-content" />
+      <LinearGradient colors={['#6C63FF', '#3F2B96']} style={styles.headerGradient}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.notificationBtn}
+            onPress={() =>
+              navigation.navigate('NotificationScreen', {
+                username: username,
+                address: address,
+              })
+            }
+          >
+            <Ionicons name="notifications-outline" size={24} color="#fff" />
+
+            
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.badgeText}>{notificationCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+        </View>
+      </LinearGradient>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileSection}>
+          <View style={styles.profileImageContainer}>
+            <Image
+              source={
+                imageUrl
+                  ? { uri: imageUrl }
+                  : require('../img/profile.png')
+              }
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                borderWidth: 2,
+                borderColor: '#fff',
+                alignSelf: 'center',
+                marginBottom: 10,
+              }}
+            />
+          </View>
+
+          <Text style={styles.userName}>{name}</Text>
+          <Text style={styles.userEmail}>{dbEmail}</Text>
+
+          <TouchableOpacity style={styles.viewActivityBtn}>
+            <Text style={styles.viewActivityText}>View Activity</Text>
+            <Ionicons name="arrow-forward" size={16} color="#4F46E5" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.menuContainer}>
+          <ProfileItem icon="cog" text="Profile Settings" bg="#6366F1" onPress={() => navigation.navigate('ProfileSettingsScreen', { username: name })}
+          />
+          <ProfileItem icon="history" text="My Orders" bg="#14B8A6" onPress={() => navigation.navigate('OrderHistoryScreen', { username: name })} />
+
+          <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('ChatBot', { username: name })} />
+        </View>
+
+        <TouchableOpacity style={styles.signOutContainer} onPress={() => setModalVisible(true)}>
+          <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.signOutGradient}>
+            <Ionicons name="log-out-outline" size={20} color="#fff" />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
+
+
+      <Modal
+        transparent
+        visible={modalVisible}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Sign Out</Text>
+            <Text style={styles.modalMessage}>Are you sure you want to sign out?</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#E5E7EB' }]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={{ color: '#1F2937' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#DC2626' }]}
+                onPress={handleSignOut}
+              >
+                <Text style={{ color: '#fff' }}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  // 🔹 Container
+  container: {
+    flex: 1,
+    paddingBottom: 70,
+    backgroundColor: '#f8f9fa',
+  },
+
+  // 🔹 Header
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  backBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    borderRadius: 25,
+  },
+  notificationBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    borderRadius: 25,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
+  // 🔹 ScrollView
+  scrollView: {
+    flex: 1,
+    paddingTop: 30,
+  },
+
+  // 🔹 Profile Section
+  profileSection: {
+    marginTop: 30,
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginTop: -30,
+    borderRadius: 20,
+    elevation: 5,
+  },
+  profileImageContainer: {
+    marginBottom: 15,
+    borderWidth: 1,
+    borderRadius: 50,
+    height: 60,
+    width: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 5,
+  },
+  userEmail: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 15,
+  },
+  viewActivityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+  },
+  viewActivityText: {
+    fontSize: 16,
+    color: '#4F46E5',
+    fontWeight: '600',
+    marginRight: 5,
+  },
+
+  // 🔹 Menu Section
+  menuContainer: {
+    marginHorizontal: 20,
+    marginTop: 20,
+  },
+  menuItem: {
+    marginBottom: 15,
+    borderRadius: 15,
+    overflow: 'hidden',
+    elevation: 5,
+  },
+  menuItemGradient: {
+    padding: 20,
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  menuItemTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuItemText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+  },
+  badge: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
+  // 🔹 Sign Out Button
+  signOutContainer: {
+    marginHorizontal: 20,
+    marginTop: 30,
+    marginBottom: 40,
+  },
+  signOutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    borderRadius: 15,
+    elevation: 5,
+  },
+  signOutText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 25,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 10,
+    color: '#111827',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+});
+export default ProfileScreen;
