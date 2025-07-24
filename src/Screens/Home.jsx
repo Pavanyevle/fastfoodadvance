@@ -242,16 +242,21 @@ const Home = ({ navigation, route }) => {
 
 
   const renderFoodItem = ({ item }) => (
-    <TouchableOpacity style={styles.foodItem}>
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={styles.foodItemGradient}
-      >
-        <MaterialCommunityIcons name={item.icon} size={30} color="#fff" />
-      </LinearGradient>
-      <Text style={styles.foodName}>{item.name}</Text>
-    </TouchableOpacity>
-  );
+  <TouchableOpacity
+    style={styles.foodItem}
+    onPress={() => navigation.navigate('PopularRecipesScreen', { title: item.name })}  // <-- navigation इथे वापरलं
+  >
+    <LinearGradient
+      colors={['#667eea', '#764ba2']}
+      style={styles.foodItemGradient}
+    >
+      <MaterialCommunityIcons name={item.icon} size={30} color="#fff" />
+    </LinearGradient>
+    <Text style={styles.foodName}>{item.name}</Text>
+  </TouchableOpacity>
+);
+
+
   const renderPopularRecipe = ({ item }) => {
     console.log("📸 Image URL:", item.image);
 

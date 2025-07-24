@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
+  ActivityIndicator ,
   Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -22,7 +23,7 @@ const itemWidth = (screenWidth - 60) / 2;
 const PopularRecipesScreen = ({ navigation, route }) => {
   const [popularRecipes, setPopularRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { username, address } = route.params || {};
+const { username, address, title } = route.params || {};
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
@@ -44,31 +45,39 @@ const PopularRecipesScreen = ({ navigation, route }) => {
 
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await axios.get(
-          'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json'
-        );
-        const data = res.data;
+  const fetchData = async () => {
+    try {
+      const res = await axios.get(
+        'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json'
+      );
+      const data = res.data;
 
-        if (data) {
-          const list = Object.keys(data).map(id => ({
-            id,
-            ...data[id],
-          }));
-          setPopularRecipes(list);
-        } else {
-          setPopularRecipes([]);
-        }
-      } catch (err) {
-        console.log('❌ Failed to fetch food:', err);
-      } finally {
-        setLoading(false);
+      if (data) {
+        const list = Object.keys(data).map(id => ({
+          id,
+          ...data[id],
+        }));
+
+        // ✅ जर title दिलं असेल तर filter कर, नाहीतर सगळं
+       const filteredList = title?.trim()
+  ? list.filter(item =>
+      item.name?.toLowerCase().includes(title.toLowerCase())
+    )
+  : list;
+        setPopularRecipes(filteredList);
+      } else {
+        setPopularRecipes([]);
       }
-    };
+    } catch (err) {
+      console.log('❌ Failed to fetch food:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchData();
-  }, []);
+  fetchData();
+}, [title]);
+
 
   const renderRecipeItem = ({ item }) => (
     <TouchableOpacity
@@ -95,9 +104,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
               ]}
             />
           </View>
-          <View style={styles.categoryTag}>
-            <Text style={styles.categoryText}>{item.category}</Text>
-          </View>
+        
         </View>
       </View>
 
@@ -107,8 +114,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
         </Text>
 
         <View style={styles.ratingRow}>
-          <Ionicons name="star" size={14} color="#FFD700" />
-          <Text style={styles.ratingText}>{item.rating}</Text>
+         
         </View>
 
         <Text style={styles.description} numberOfLines={2}>
@@ -118,7 +124,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
         <View style={styles.iconRow}>
           <View style={styles.infoItem}>
             <Ionicons name="time-outline" size={14} color="#667eea" />
-            <Text style={styles.infoText}>{item.deliveryTime}m</Text>
+            <Text style={styles.infoText}>{item.preparationTime}m</Text>
           </View>
           <View style={styles.infoItem}>
             <MaterialCommunityIcons
@@ -133,7 +139,6 @@ const PopularRecipesScreen = ({ navigation, route }) => {
         <View style={styles.footerRow}>
           <View>
             <Text style={styles.priceText}>₹{item.price}</Text>
-            <Text style={styles.prepTime}>{item.preparationTime}</Text>
           </View>
           <TouchableOpacity
             style={styles.addButton}
@@ -166,7 +171,18 @@ const PopularRecipesScreen = ({ navigation, route }) => {
           Most loved dishes by our customers
         </Text>
       </LinearGradient>
+<View style={{ padding: 10 }}>
+  {title?.trim() ? (
+    <Text style={styles.categoryTitle}>{title}</Text>
+  ) : null}
+</View>
 
+     {loading ? (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#667eea" />
+        <Text style={styles.loaderText}>Loading recipes...</Text>
+      </View>
+    ) : (
       <FlatList
         data={popularRecipes}
         renderItem={renderRecipeItem}
@@ -174,7 +190,14 @@ const PopularRecipesScreen = ({ navigation, route }) => {
         numColumns={2}
         columnWrapperStyle={{ justifyContent: 'space-between' }}
         contentContainerStyle={styles.recipeList}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No recipes found</Text>
+          </View>
+        )}
       />
+    )}
+
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -216,6 +239,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  categoryTitle: {
+  fontSize: 20,
+  fontWeight: 'bold',
+  color: '#667eea',
+  textAlign: 'center',
+  marginVertical: 10,
+  textTransform: 'capitalize',
+},
+loaderContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  backgroundColor: '#f8f9fa',
+},
+
+loaderText: {
+  marginTop: 10,
+  fontSize: 16,
+  color: '#667eea',
+  fontWeight: '500',
+},
 
   modalBox: {
     width: '80%',
@@ -412,4 +457,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 5,
   },
+  emptyContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 250,
+},
+emptyText: {
+  fontSize: 16,
+  color: '#999',
+  marginTop: 10,
+  textAlign: 'center',
+  fontWeight: '500',
+},
+emptyImage: {
+  width: 150,
+  height: 150,
+  tintColor: '#ccc',
+},
+
 });
