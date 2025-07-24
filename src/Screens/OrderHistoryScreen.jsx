@@ -124,7 +124,8 @@ const OrderHistoryScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.amount}>₹{item.price}</Text>
+          
+  <Text style={styles.amount}>₹{item.totalAmount || item.price}</Text>
           <Text style={styles.date}>{new Date(item.orderTime).toLocaleDateString()}</Text>
         </View>
 
@@ -217,6 +218,8 @@ const OrderHistoryScreen = ({ navigation, route }) => {
                 }}>
                 Status: {selectedOrder.status}
               </Text>
+              <Text>Quantity: {selectedOrder.quantity}</Text>
+
               <Text>Total Amount: ₹{selectedOrder.totalAmount}</Text>
               <Text>Date: {new Date(selectedOrder.orderTime).toLocaleString()}</Text>
               <Text style={{ marginTop: 4 }}>Address: {selectedOrder.address}</Text>

@@ -32,7 +32,7 @@ const PaymentScreen = ({ navigation, route }) => {
 
 
 
-  const { totalItems, totalPrice, itemIds, username, address } = route.params;
+const { totalItems, totalPrice, itemIds, quantities, username, address } = route.params;
 
 
   const paymentMethods = [
@@ -70,51 +70,52 @@ const PaymentScreen = ({ navigation, route }) => {
   };
 
   const confirmOrder = async () => {
-    setIsSavingOrder(true);
+  setIsSavingOrder(true);
 
-    try {
-      const savePromises = itemIds.map(async (itemId) => {
-        // 🔍 food details Firebase से fetch करो
-        const foodRes = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/${itemId}.json`);
-        const foodData = foodRes.data;
+  try {
+    const savePromises = itemIds.map(async (itemId) => {
+      // 🔍 food details Firebase से fetch करो
+      const foodRes = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/${itemId}.json`);
+      const foodData = foodRes.data;
 
-        const orderData = {
-          itemId: itemId,
-          name: foodData.name || '',
-          description: foodData.description || '',
-          image: foodData.image || '',
-          price: foodData.price || 0,
-          quantity: 1,
-          paymentMethod: selectedPaymentMethod,
-          orderTime: new Date().toISOString(),
-          status: 'placed',
-          deliveryTime: '30 mins',
-          address: address,
-          totalAmount: totalPrice,
-        };
+      const quantity = quantities[itemId] || 1;
+      const totalAmountForItem = foodData.price * quantity;
 
-        const uniqueId = Math.random().toString(36).substring(2, 10); // 
+      const orderData = {
+        itemId: itemId,
+        name: foodData.name || '',
+        description: foodData.description || '',
+        image: foodData.image || '',
+        price: foodData.price || 0,
+        quantity: quantity,                        // ✅ actual quantity
+        paymentMethod: selectedPaymentMethod,
+        orderTime: new Date().toISOString(),
+        status: 'placed',
+        deliveryTime: '30 mins',
+        address: address,
+        totalAmount: totalAmountForItem,           // ✅ quantity based total
+      };
 
-        return axios.put(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders/${itemId}.json`,
-          orderData
-        );
-      });
+     return axios.post(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders.json`,
+        orderData
+      );
+    });
 
-      await Promise.all(savePromises);
+    await Promise.all(savePromises);
 
-      setIsSavingOrder(false);
-      setConfirmationVisible(false);
-      navigation.replace('MainTabs', {
-        orderId: itemIds,
-        username: username,
-      });
+    setIsSavingOrder(false);
+    setConfirmationVisible(false);
+    navigation.replace('MainTabs', {
+      orderId: itemIds,
+      username: username,
+    });
 
-    } catch (err) {
-      setIsSavingOrder(false);
-      Alert.alert('Error', 'Failed to save order. Try again later.');
-    }
-  };
+  } catch (err) {
+    setIsSavingOrder(false);
+    Alert.alert('Error', 'Failed to save order. Try again later.');
+  }
+};
 
 
 

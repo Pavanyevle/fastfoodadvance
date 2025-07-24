@@ -37,39 +37,76 @@ const OrderScreen = ({ navigation, route }) => {
 
   const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com';
 
+  const fetchQuantity = async () => {
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+    if (res.data) {
+      const itemKey = Object.keys(res.data).find(
+        key => res.data[key].foodId === id
+      );
+      if (itemKey) {
+        const quantity = res.data[itemKey].quantity;
+        setQuantity(quantity);
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching quantity:", error);
+  }
+};
+const updateQuantity = async (newQty) => {
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+    if (res.data) {
+      const itemKey = Object.keys(res.data).find(
+        key => res.data[key].foodId === id
+      );
+      if (itemKey) {
+        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${itemKey}.json`, {
+          quantity: newQty,
+        });
+        setQuantity(newQty);
+      }
+    }
+  } catch (err) {
+    console.error("Error updating quantity:", err);
+  }
+};
+
   useEffect(
 
 
     
     useCallback(() => {
       const fetchCartItems = async () => {
-        try {
-          const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-          if (res.data) {
-            const foodIds = Object.values(res.data).map(item => item.foodId);
-            const foodDetailsPromises = foodIds.map(id =>
-              axios.get(`${FIREBASE_DB_URL}/foods/${id}.json`).then(res => {
-                const price = parseInt(res.data.price);
-                return {
-                  ...res.data,
-                  id,
-                  price,
-                  quantity: 1,
-                  total: `₹${price}`,
-                };
-              })
-            );
-            const foodDetails = await Promise.all(foodDetailsPromises);
-            setCartItems(foodDetails);
-          } else {
-            setCartItems([]);
-          }
-        } catch (error) {
-          console.error("Error fetching cart items:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+    if (res.data) {
+      const foodEntries = Object.entries(res.data); // ✅ key-value format
+      const foodDetailsPromises = foodEntries.map(async ([key, value]) => {
+        const foodId = value.foodId;
+        const quantity = value.quantity || 1; // Firebase मधून quantity
+        const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${foodId}.json`);
+        const price = parseInt(foodRes.data.price);
+        return {
+          ...foodRes.data,
+          id: foodId,
+          price,
+          quantity,
+          total: `₹${price * quantity}`,
+        };
+      });
+
+      const foodDetails = await Promise.all(foodDetailsPromises);
+      setCartItems(foodDetails);
+    } else {
+      setCartItems([]);
+    }
+  } catch (error) {
+    console.error("Error fetching cart items:", error);
+  } finally {
+    setLoading(false);
+  }
+};
        const fetchUserAddress = async () => {
     try {
       const res = await axios.get(
@@ -116,22 +153,37 @@ const OrderScreen = ({ navigation, route }) => {
     setDeleteModalVisible(true);
   };
 
-  const handleQuantityChange = (itemId, change) => {
-    setCartItems(prevItems =>
-      prevItems.map(item => {
-        if (item.id === itemId) {
-          const newQuantity = Math.max(1, item.quantity + change);
-          const updatedTotal = item.price * newQuantity;
-          return {
-            ...item,
-            quantity: newQuantity,
-            total: `₹${updatedTotal}`,
-          };
-        }
-        return item;
-      })
-    );
-  };
+ const handleQuantityChange = async (itemId, change) => {
+  const updatedItems = cartItems.map(item => {
+    if (item.id === itemId) {
+      const newQuantity = Math.max(1, item.quantity + change);
+      const updatedTotal = item.price * newQuantity;
+      return {
+        ...item,
+        quantity: newQuantity,
+        total: `₹${updatedTotal}`,
+      };
+    }
+    return item;
+  });
+
+  setCartItems(updatedItems);
+
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+    if (res.data) {
+      const key = Object.keys(res.data).find(k => res.data[k].foodId === itemId);
+      if (key) {
+        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`, {
+          quantity: updatedItems.find(i => i.id === itemId).quantity,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Error updating Firebase quantity:", err);
+  }
+};
+
 
   const deliveryAddresses = [
     { id: '1', name: 'Home', address: address, selected: true },
@@ -171,28 +223,35 @@ const OrderScreen = ({ navigation, route }) => {
   );
 
   const handlePlaceOrder = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      const itemIds = cartItems.map(item => item.id);
-      navigation.navigate('PaymentScreen', {
-        totalItems: cartItems.length,
-        totalPrice: total,
-        itemIds: itemIds,
-        username: username,
-        address: address,
-      });
+  Animated.sequence([
+    Animated.timing(scaleAnim, {
+      toValue: 0.95,
+      duration: 80,
+      useNativeDriver: true,
+    }),
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      useNativeDriver: true,
+    }),
+  ]).start(() => {
+    const itemIds = cartItems.map(item => item.id); // ✅ All item IDs
+    const quantities = {}; // ✅ id: quantity
+    cartItems.forEach(item => {
+      quantities[item.id] = item.quantity;
     });
-  };
+
+    navigation.navigate('PaymentScreen', {
+      totalItems: cartItems.length,  // ✅ eg: 3 items
+      totalPrice: total,             // ✅ eg: ₹500
+      itemIds: itemIds,              // ✅ eg: ['id1', 'id2']
+      quantities: quantities,        // ✅ eg: { 'id1': 2, 'id2': 1 }
+      username: username,
+      address: address,
+    });
+  });
+};
+
 
   return (
     <SafeAreaView style={styles.container}>

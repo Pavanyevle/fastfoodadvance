@@ -494,9 +494,7 @@ const Home = ({ navigation, route }) => {
                       <Text style={styles.promoTitle}>{item.title1}</Text>
                       <Text style={styles.promoSubtitle}>{item.title2}</Text>
                       <Text style={styles.promoDesc}>{item.subtitle}</Text>
-                      <TouchableOpacity style={styles.orderBtn}>
-                        <Text style={styles.orderText}>Order Now</Text>
-                      </TouchableOpacity>
+                    
                     </View>
                     {item.image && (
                       <Image source={item.image} style={styles.promoImage} />
@@ -707,7 +705,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   sliderContainer: {
-    height: 190,
+    height: 150,
     marginBottom: 20,
   },
   slideContainer: {
@@ -716,7 +714,7 @@ const styles = StyleSheet.create({
   },
   promoCard: {
     borderRadius: 20,
-    height: 190,
+    height: 150,
     overflow: 'hidden',
 
   },
