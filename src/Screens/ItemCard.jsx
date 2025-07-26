@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,16 +16,33 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 
+// Get device width for responsive design
 const { width } = Dimensions.get('window');
+// Firebase Realtime Database URL
 const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com';
 
+/**
+ * FoodDetailScreen
+ * Displays detailed information about a food item.
+ * Allows user to adjust quantity, add to cart, and proceed to order.
+ */
 const FoodDetailScreen = ({ navigation, route }) => {
+  // Get food id, username, and address from navigation params
   const { id, username, address } = route.params;
+
+  // State for food details
   const [food, setFood] = useState(null);
+  // State for selected quantity
   const [quantity, setQuantity] = useState(1);
+  // Loading state for fetching food data
   const [loading, setLoading] = useState(true);
+  // Modal state for "Added to Cart" confirmation
   const [showModal, setShowModal] = useState(false);
 
+  /**
+   * Handle "Order Now" button press
+   * Navigates to OrderScreen with selected food and quantity
+   */
   const handleOrderNow = async () => {
     try {
       navigation.navigate('OrderScreen', {
@@ -42,20 +57,36 @@ const FoodDetailScreen = ({ navigation, route }) => {
     }
   };
 
+  /**
+   * Add current food item to user's cart in Firebase
+   * If already in cart, update quantity; else, create new cart item
+   */
   const addToCart = async () => {
-  try {
-    await axios.put(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`, {
-      foodId: id,
-      quantity: quantity,
-    });
-  } catch (error) {
-    console.error("Error adding to cart:", error);
-  } finally {
-    setShowModal(false);
-  }
-};
+    try {
+      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`);
 
+      if (res.data) {
+        // If item already in cart, update quantity
+        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`, {
+          quantity: quantity,
+        });
+      } else {
+        // If new item, create with foodId and quantity
+        await axios.put(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`, {
+          foodId: id,
+          quantity: quantity,
+        });
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    } finally {
+      setShowModal(false);
+    }
+  };
 
+  /**
+   * Fetch food details from Firebase on mount
+   */
   useEffect(() => {
     const fetchFood = async () => {
       try {
@@ -70,9 +101,12 @@ const FoodDetailScreen = ({ navigation, route }) => {
     fetchFood();
   }, [id]);
 
+  // Increment quantity
   const increment = () => setQuantity(prev => prev + 1);
+  // Decrement quantity (min 1)
   const decrement = () => quantity > 1 && setQuantity(prev => prev - 1);
 
+  // Show loader while fetching food data
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -81,6 +115,7 @@ const FoodDetailScreen = ({ navigation, route }) => {
     );
   }
 
+  // Show message if food not found
   if (!food) {
     return (
       <View style={styles.loaderContainer}>
@@ -89,28 +124,34 @@ const FoodDetailScreen = ({ navigation, route }) => {
     );
   }
 
+  // Main UI render
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
 
+      {/* Header with back button */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
+      {/* Scrollable content with food image and details */}
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Food image with overlay */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: food.image }} style={styles.foodImage} />
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.imageOverlay} />
         </View>
 
+        {/* Food details section */}
         <View style={styles.content}>
           <Text style={styles.foodTitle}>{food.name}</Text>
           <Text style={styles.foodSubtitle}>{food.description}</Text>
 
+          {/* Nutrition info */}
           <View style={styles.nutritionContainer}>
-            {['Fat', 'Carbs', 'Protein'].map((label, idx) => (
+            {['Fatsc', 'Carbs', 'Protein'].map((label, idx) => (
               <View key={idx} style={styles.nutrientBox}>
                 <Text style={styles.nutrientLabel}>{label}</Text>
                 <Text style={styles.nutrientValue}>{food[label.toLowerCase()]}g</Text>
@@ -118,11 +159,13 @@ const FoodDetailScreen = ({ navigation, route }) => {
             ))}
           </View>
 
+          {/* Delivery time */}
           <View style={styles.deliveryContainer}>
             <Text style={styles.deliveryLabel}>Delivery Time:</Text>
             <Text style={styles.deliveryTime}>{food.preparationTime} mins</Text>
           </View>
 
+          {/* Quantity selector and price */}
           <View style={styles.priceQuantityRow}>
             <View style={styles.quantityContainer}>
               <TouchableOpacity onPress={decrement} style={styles.qtyBtn}>
@@ -142,6 +185,7 @@ const FoodDetailScreen = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
+      {/* Action buttons: Add to Cart & View Cart */}
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.buttonContainer} onPress={() => setShowModal(true)}>
           <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.buttonGradient}>
@@ -156,18 +200,20 @@ const FoodDetailScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Modal for "Added to Cart" confirmation */}
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Ionicons name="checkmark-circle" size={60} color="#22c55e" />
             <Text style={styles.modalTitle}>Added to Cart</Text>
             <TouchableOpacity style={styles.buttonContainer} onPress={addToCart}>
-              <LinearGradient colors={["#667eea", "#764ba2"]} style={{ paddingVertical: 12,
-    borderRadius: 10,
-    width:70,
-    
-    justifyContent: 'center',
-    alignItems: 'center'}}>
+              <LinearGradient colors={["#667eea", "#764ba2"]} style={{
+                paddingVertical: 12,
+                borderRadius: 10,
+                width: 70,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
                 <Text style={styles.buttonText}>OK</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -177,6 +223,8 @@ const FoodDetailScreen = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   screen: {
@@ -200,7 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 25
   },
   scrollContainer: {
-    paddingBottom: 160,
+   
   },
   imageContainer: {
     height: 350,
@@ -224,8 +272,8 @@ const styles = StyleSheet.create({
     marginTop: -30,
     padding: 20,
     elevation: 10,
-    flex:1,
-     minHeight: 600,
+    flex: 1,
+    minHeight: 600,
   },
   foodTitle: {
     fontSize: 26,
@@ -312,7 +360,7 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 30,
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -321,7 +369,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingVertical: 10,
     borderRadius: 15,
-    elevation: 10,
   },
   buttonContainer: {
     flex: 1,
@@ -330,7 +377,7 @@ const styles = StyleSheet.create({
   buttonGradient: {
     paddingVertical: 12,
     borderRadius: 10,
-    
+
     justifyContent: 'center',
     alignItems: 'center'
   },

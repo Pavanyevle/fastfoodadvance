@@ -14,9 +14,22 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Get device height for responsive UI
 const { height } = Dimensions.get('window');
 
+/**
+ * Login Screen
+ * Handles both Sign In and Sign Up flows.
+ * Features:
+ * - User authentication (login/signup) with Firebase
+ * - Form validation and error handling
+ * - Password visibility toggle
+ * - Remember me and forgot password
+ * - Social login buttons (UI only)
+ * - Loading indicators for async actions
+ */
 const Login = ({ navigation }) => {
+  // State variables for form fields and UI
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -24,16 +37,23 @@ const Login = ({ navigation }) => {
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(true); // Toggle between login/signup
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [username, setUsername] = useState('');
 
-
-
+  // Helper to show error messages
   const showError = (msg) => setErrorMsg(msg);
 
+  /**
+   * Handle user sign up
+   * - Validates input fields
+   * - Checks if username exists in Firebase
+   * - Creates new user in Firebase
+   * - Stores credentials in AsyncStorage
+   * - Navigates to MainTabs on success
+   */
   const handleSignUp = async () => {
     setErrorMsg('');
 
@@ -47,6 +67,7 @@ const Login = ({ navigation }) => {
     setLoadingSignup(true);
 
     try {
+      // Check if username already exists
       const userExists = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`);
 
       if (userExists.data) {
@@ -55,7 +76,7 @@ const Login = ({ navigation }) => {
         return;
       }
 
-
+      // Create new user in Firebase
       await axios.put(
         `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
         {
@@ -64,9 +85,11 @@ const Login = ({ navigation }) => {
           address: '.....', // Default address
         }
       );
+      // Store credentials locally
       await AsyncStorage.setItem('username', username);
       await AsyncStorage.setItem('password', password);
 
+      // Navigate to main app
       navigation.navigate('MainTabs', { username: username });
     } catch (error) {
       showError('Signup failed. Try again.');
@@ -80,42 +103,51 @@ const Login = ({ navigation }) => {
     }
   };
 
- const handleLogin = async () => {
-  setErrorMsg('');
+  /**
+   * Handle user login
+   * - Validates input fields
+   * - Fetches user data from Firebase
+   * - Checks password
+   * - Stores credentials in AsyncStorage
+   * - Navigates to MainTabs on success
+   */
+  const handleLogin = async () => {
+    setErrorMsg('');
 
-  if (!username || !password)
-    return showError('Enter username and password');
+    if (!username || !password)
+      return showError('Enter username and password');
 
-  setLoadingLogin(true);
+    setLoadingLogin(true);
 
-  try {
-    // ✅ Firebase से user data fetch करो
-    const response = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`);
-    const userData = response.data;
+    try {
+      // Fetch user data from Firebase
+      const response = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`);
+      const userData = response.data;
 
-    if (!userData) {
-      showError('Username not found');
-    } else if (userData.password !== password) {
-      showError('Incorrect password');
-    } else {
-      // ✅ Login success: अब locally save करो
-      await AsyncStorage.setItem('username', username);
-      await AsyncStorage.setItem('password', password);
+      if (!userData) {
+        showError('Username not found');
+      } else if (userData.password !== password) {
+        showError('Incorrect password');
+      } else {
+        // Login success: store credentials
+        await AsyncStorage.setItem('username', username);
+        await AsyncStorage.setItem('password', password);
 
-      // Navigate to home
-      navigation.navigate('MainTabs', { username: username });
+        // Navigate to main app
+        navigation.navigate('MainTabs', { username: username });
+      }
+
+    } catch (error) {
+      showError('Login failed');
+      console.log('Login Error:', error);
+    } finally {
+      setLoadingLogin(false);
     }
+  };
 
-  } catch (error) {
-    showError('Login failed');
-    console.log('Login Error:', error);
-  } finally {
-    setLoadingLogin(false);
-  }
-};
-
-
-
+  /**
+   * Render a styled input field with icon and optional password visibility toggle
+   */
   const renderInput = (icon, placeholder, value, onChangeText, isPassword = false, toggleVisibility, showValue) => (
     <View style={styles.inputContainer}>
       <Ionicons name={icon} size={20} color="#666" style={styles.inputIcon} />
@@ -136,9 +168,11 @@ const Login = ({ navigation }) => {
     </View>
   );
 
+  // Main UI render
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D2B" />
+      {/* Header section with title and subtitle */}
       <View style={styles.headerSection}>
         <Text style={styles.title}>Welcome to FastFood</Text>
         <Text style={styles.subtitle}>
@@ -146,7 +180,9 @@ const Login = ({ navigation }) => {
         </Text>
       </View>
 
+      {/* Main form container */}
       <View style={styles.formContainer}>
+        {/* Tabs for switching between Sign In and Sign Up */}
         <View style={styles.tabContainer}>
           <TouchableOpacity style={[styles.tabButton, isLogin && styles.activeTabButton]} onPress={() => setIsLogin(true)}>
             <Text style={[styles.tabText, isLogin && styles.activeTabText]}>Sign In</Text>
@@ -156,18 +192,17 @@ const Login = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Form fields for login/signup */}
         <View style={styles.formFields}>
           {renderInput('person-outline', 'Username', username, setUsername)}
-
-
           {!isLogin && renderInput('mail-outline', 'Email address', email, setEmail)}
-
           {renderInput('lock-closed-outline', 'Password', password, setPassword, true, () => setShowPassword(!showPassword), showPassword)}
-
           {!isLogin && renderInput('lock-closed-outline', 'Confirm password', confirmPassword, setConfirmPassword, true, () => setShowConfirmPassword(!showConfirmPassword), showConfirmPassword)}
 
+          {/* Error message display */}
           {errorMsg.length > 0 && <Text style={{ color: 'red', marginBottom: 10 }}>{errorMsg}</Text>}
 
+          {/* Remember me and forgot password (login only) */}
           {isLogin && (
             <View style={styles.rememberForgotRow}>
               <TouchableOpacity style={styles.rememberContainer} onPress={() => setRemember(!remember)}>
@@ -182,6 +217,7 @@ const Login = ({ navigation }) => {
             </View>
           )}
 
+          {/* Submit button for login/signup */}
           <TouchableOpacity
             style={[styles.submitButton, (loadingLogin || loadingSignup) && styles.disabledButton]}
             onPress={isLogin ? handleLogin : handleSignUp}
@@ -195,6 +231,7 @@ const Login = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Divider and social login buttons (UI only) */}
         <View style={styles.dividerContainer}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>or continue with</Text>
@@ -217,6 +254,7 @@ const Login = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Loading overlay while authenticating */}
       {(loadingLogin || loadingSignup) && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingContainer}>
@@ -231,6 +269,7 @@ const Login = ({ navigation }) => {
 
 export default Login;
 
+// Styles for Login screen components
 const styles = StyleSheet.create({
   container: {
     flex: 1,

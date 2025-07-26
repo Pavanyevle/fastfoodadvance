@@ -10,6 +10,11 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
+
+/**
+ * Steps for order status tracker
+ * Each step has a label and an icon
+ */
 const orderSteps = [
   { label: 'Placed', icon: 'cart-outline' },
   { label: 'Confirmed', icon: 'check-circle-outline' },
@@ -18,10 +23,20 @@ const orderSteps = [
   { label: 'Delivered', icon: 'home-outline' },
 ];
 
-
+/**
+ * OrderStatusScreen
+ * Shows the current status of a user's order with a visual tracker.
+ * Features:
+ * - Polls Firebase for live order status and delivery time
+ * - Displays order summary, status tracker, estimated delivery, and address
+ */
 const OrderStatusScreen = ({ navigation, route }) => {
+  // Get order, orderId, username, and address from navigation params
   const { order, orderId, username, address } = route.params;
 
+  /**
+   * Get the index of the current step based on order status
+   */
   const getStepIndex = (status) => {
     const steps = {
       placed: 0,
@@ -33,30 +48,38 @@ const OrderStatusScreen = ({ navigation, route }) => {
     return steps[status?.toLowerCase()] ?? -1;
   };
 
+  // State for current order status and step index
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const [currentStep, setCurrentStep] = useState(getStepIndex(order.status));
+  // State for estimated delivery time
+  const [deliveryTime, setDeliveryTime] = useState("30 mins");
 
-
-
+  /**
+   * Poll for order status and delivery time updates every second
+   * Updates UI if status or delivery time changes
+   */
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
+        // Fetch updated status from Firebase
         const statusRes = await axios.get(
           `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders/${order.id}/status.json`
         );
         const updatedStatus = statusRes.data;
 
+        // Fetch updated delivery time from Firebase
         const timeRes = await axios.get(
           `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders/${order.id}/deliveryTime.json`
         );
         const updatedTime = timeRes.data;
 
-
+        // Update status and step if changed
         if (updatedStatus !== currentStatus) {
           setCurrentStatus(updatedStatus);
           setCurrentStep(getStepIndex(updatedStatus));
         }
 
+        // Update delivery time if changed
         if (updatedTime && updatedTime !== deliveryTime) {
           setDeliveryTime(updatedTime);
         }
@@ -67,13 +90,13 @@ const OrderStatusScreen = ({ navigation, route }) => {
 
     return () => clearInterval(interval);
   }, []);
-  const [deliveryTime, setDeliveryTime] = useState("30 mins");
 
+  // Main UI render
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
 
-      {/* Header */}
+      {/* Header with back button and title */}
       <LinearGradient colors={['#1e293b', '#334155']} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#fff" />
@@ -82,15 +105,15 @@ const OrderStatusScreen = ({ navigation, route }) => {
         <View style={styles.headerRight} />
       </LinearGradient>
 
-      {/* Welcome Message */}
+      {/* Welcome message with username */}
       <View style={styles.welcomeContainer}>
         <Text style={styles.welcomeText}>Hello, {username}</Text>
       </View>
 
-      {/* Main Content */}
+      {/* Main content scrollable area */}
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
 
-        {/* Order Summary */}
+        {/* Order summary card */}
         <View style={styles.card}>
           <Text style={styles.orderId}>Order #{order.id}</Text>
           <Text style={styles.orderDate}>{order.orderTime}</Text>
@@ -99,7 +122,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Status Tracker */}
+        {/* Status tracker visual component */}
         <View style={styles.statusContainer}>
           {orderSteps.map((step, idx) => (
             <View key={step.label} style={styles.stepContainer}>
@@ -123,6 +146,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
               >
                 {step.label}
               </Text>
+              {/* Connecting line between steps */}
               {idx < orderSteps.length - 1 && (
                 <View
                   style={[
@@ -135,7 +159,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
           ))}
         </View>
 
-        {/* Estimated Delivery */}
+        {/* Estimated delivery time or status */}
         <View style={styles.card}>
           <Text style={styles.estimateTitle}>Estimated Delivery</Text>
           {typeof currentStatus === 'string' && currentStatus.toLowerCase() === 'cancelled' ? (
@@ -147,10 +171,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
           )}
         </View>
 
-
-
-
-        {/* Address */}
+        {/* Delivery address card */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
           <Text style={styles.addressText}>{order.address}</Text>
@@ -159,6 +180,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   header: {

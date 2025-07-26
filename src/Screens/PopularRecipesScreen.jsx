@@ -16,25 +16,89 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Calculate item width for 2-column grid
 const screenWidth = Dimensions.get('window').width;
 const itemWidth = (screenWidth - 60) / 2;
 
+/**
+ * PopularRecipesScreen
+ * Displays a grid of popular recipes (foods) fetched from Firebase.
+ * Features:
+ * - Fetches food data from Firebase
+ * - Allows filtering by category (if title param is provided)
+ * - Lets user add/remove items to/from cart and adjust quantity
+ * - Shows modal on successful add to cart
+ * - Navigates to ItemCard for details and to OrderScreen for cart
+ */
 const PopularRecipesScreen = ({ navigation, route }) => {
+  // State for all recipes
   const [popularRecipes, setPopularRecipes] = useState([]);
+  // Loading state for fetching recipes
   const [loading, setLoading] = useState(true);
-const { username, address, title } = route.params || {};
+  // Category title from navigation params (for filtering)
+  const { title } = route.params || {};
+  // Modal state for "Added to Cart" confirmation
   const [showModal, setShowModal] = useState(false);
+  // State for item quantities in cart
+  const [quantities, setQuantities] = useState({});
+  // Username and address from params or storage
+  const [username, setUsername] = useState(route.params?.username || '');
+  const [address, setAddress] = useState(route.params?.address || '');
+  // Modal message and last added item (not used in UI)
   const [modalMessage, setModalMessage] = useState('');
+  const [lastAddedItemId, setLastAddedItemId] = useState(null);
 
+  /**
+   * Navigate to OrderScreen (cart)
+   */
+  const handleViewCart = () => {
+    try {
+      navigation.navigate('OrderScreen', {});
+    } catch (error) {
+      console.error("Order Now Failed:", error);
+    }
+  };
 
+  /**
+   * Add a food item to cart in Firebase
+   * If already in cart, increase quantity
+   * Shows modal on success
+   */
   const handleAddToCart = async (item) => {
     try {
-      const cartItem = { foodId: item.id };
-      await axios.post(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart.json`,
-        cartItem
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart.json`
       );
+
+      // Check if food already in cart
+      const existingItemKey = res.data
+        ? Object.keys(res.data).find(
+            key => res.data[key].foodId === item.id
+          )
+        : null;
+
+      if (existingItemKey) {
+        // Food already in cart → Increase quantity
+        const currentQty = res.data[existingItemKey].quantity || 1;
+        await axios.patch(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${existingItemKey}.json`,
+          {
+            quantity: currentQty + 1,
+          }
+        );
+      } else {
+        // Food not in cart → Add it with quantity 1
+        await axios.put(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`,
+          {
+            foodId: item.id,
+            quantity: 1,
+          }
+        );
+      }
+
       setShowModal(true);
     } catch (error) {
       console.log('Error adding to cart:', error);
@@ -42,43 +106,87 @@ const { username, address, title } = route.params || {};
     }
   };
 
-
-
-  useEffect(() => {
-  const fetchData = async () => {
+  /**
+   * Load username and address from AsyncStorage
+   */
+  const loadUserData = async () => {
     try {
-      const res = await axios.get(
-        'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json'
-      );
-      const data = res.data;
+      const storedUsername = await AsyncStorage.getItem('username');
+      const storedAddress = await AsyncStorage.getItem('address');
 
-      if (data) {
-        const list = Object.keys(data).map(id => ({
-          id,
-          ...data[id],
-        }));
+      if (storedUsername) setUsername(storedUsername);
+      if (storedAddress) setAddress(storedAddress);
 
-        // ✅ जर title दिलं असेल तर filter कर, नाहीतर सगळं
-       const filteredList = title?.trim()
-  ? list.filter(item =>
-      item.name?.toLowerCase().includes(title.toLowerCase())
-    )
-  : list;
-        setPopularRecipes(filteredList);
-      } else {
-        setPopularRecipes([]);
-      }
-    } catch (err) {
-      console.log('❌ Failed to fetch food:', err);
-    } finally {
-      setLoading(false);
+      // Debug logs
+      console.log("Username:", storedUsername);
+      console.log("Address:", storedAddress);
+    } catch (error) {
+      console.error('Failed to load user data from storage', error);
     }
   };
 
-  fetchData();
-}, [title]);
+  /**
+   * Handle quantity change for a food item in cart
+   * Updates Firebase and local state
+   * If quantity is 0, removes item from cart
+   */
+  const handleQuantityChange = async (item, change) => {
+    const currentQty = quantities[item.id] || 0;
+    const newQty = Math.max(0, currentQty + change);
 
+    try {
+      if (newQty === 0) {
+        await axios.delete(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`
+        );
+      } else {
+        await axios.put(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`,
+          {
+            foodId: item.id,
+            quantity: newQty,
+          }
+        );
+      }
 
+      setQuantities(prev => ({
+        ...prev,
+        [item.id]: newQty,
+      }));
+    } catch (error) {
+      console.error('Failed to update quantity:', error);
+    }
+  };
+
+  /**
+   * Fetch all popular recipes (foods) from Firebase on mount
+   */
+  useEffect(() => {
+    const fetchPopularRecipes = async () => {
+      try {
+        const res = await axios.get(
+          'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json'
+        );
+        if (res.data) {
+          const recipeArray = Object.keys(res.data).map(key => ({
+            id: key,
+            ...res.data[key],
+          }));
+          setPopularRecipes(recipeArray);
+        }
+      } catch (err) {
+        console.error('Error fetching foods:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPopularRecipes();
+  }, []);
+
+  /**
+   * Render a single recipe card in the grid
+   */
   const renderRecipeItem = ({ item }) => (
     <TouchableOpacity
       style={styles.recipeCard}
@@ -87,9 +195,11 @@ const { username, address, title } = route.params || {};
           id: item.id,
           username: username,
           address: address,
+          quantities: quantities,
         })
       }
     >
+      {/* Food image and veg/non-veg dot */}
       <View style={styles.imageContainer}>
         <Image
           source={{ uri: item.image }}
@@ -104,17 +214,17 @@ const { username, address, title } = route.params || {};
               ]}
             />
           </View>
-        
         </View>
       </View>
 
+      {/* Food name, description, info, and add/quantity controls */}
       <View style={styles.cardContent}>
         <Text style={styles.recipeName} numberOfLines={1}>
           {item.name}
         </Text>
 
         <View style={styles.ratingRow}>
-         
+          {/* You can add rating stars here if needed */}
         </View>
 
         <Text style={styles.description} numberOfLines={2}>
@@ -140,25 +250,47 @@ const { username, address, title } = route.params || {};
           <View>
             <Text style={styles.priceText}>₹{item.price}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => handleAddToCart(item)}          >
-            <LinearGradient
-              colors={['#667eea', '#764ba2']}
-              style={styles.addButtonGradient}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.addButtonText}>Add</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Show quantity controls if item is in cart, else show Add button */}
+          {quantities[item.id] > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => handleQuantityChange(item, -1)}>
+                <Ionicons name="remove-circle" size={24} color="#667eea" />
+              </TouchableOpacity>
+              <Text style={{ marginHorizontal: 8, fontWeight: 'bold' }}>
+                {quantities[item.id]}
+              </Text>
+              <TouchableOpacity onPress={() => handleQuantityChange(item, 1)}>
+                <Ionicons name="add-circle" size={24} color="#667eea" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => handleQuantityChange(item, 1)}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.addButtonGradient}
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.addButtonText}>Add</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
   );
 
+  // Filter recipes by category if title is provided
+  const filteredRecipes = title
+    ? popularRecipes.filter(item =>
+        item.category?.toLowerCase() === title.toLowerCase()
+      )
+    : popularRecipes;
+
+  // Main UI render
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+      {/* Header with back button and title */}
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -171,39 +303,53 @@ const { username, address, title } = route.params || {};
           Most loved dishes by our customers
         </Text>
       </LinearGradient>
-<View style={{ padding: 10 }}>
-  {title?.trim() ? (
-    <Text style={styles.categoryTitle}>{title}</Text>
-  ) : null}
-</View>
 
-     {loading ? (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
-        <Text style={styles.loaderText}>Loading recipes...</Text>
+      {/* Category title if filtering */}
+      <View style={{ padding: 10 }}>
+        {title?.trim() ? (
+          <Text style={styles.categoryTitle}>{title}</Text>
+        ) : null}
       </View>
-    ) : (
-      <FlatList
-        data={popularRecipes}
-        renderItem={renderRecipeItem}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-        contentContainerStyle={styles.recipeList}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No recipes found</Text>
-          </View>
-        )}
-      />
-    )}
 
+      {/* Loader while fetching recipes */}
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loaderText}>Loading recipes...</Text>
+        </View>
+      ) : (
+        // Recipes grid
+        <FlatList
+          data={filteredRecipes}
+          renderItem={renderRecipeItem}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          contentContainerStyle={styles.recipeList}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No recipes found</Text>
+            </View>
+          )}
+        />
+      )}
+
+      {/* View Cart button at bottom */}
+      <View style={styles.viewCartWrapper}>
+        <TouchableOpacity style={styles.viewCartButton} onPress={handleViewCart}>
+          <LinearGradient colors={['#667eea', '#764ba2']} style={styles.viewCartGradient}>
+            <Ionicons name="cart-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.viewCartText}>View Cart</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal for "Added to Cart" confirmation */}
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Ionicons name="checkmark-circle" size={60} color="#22c55e" />
             <Text style={styles.modalTitle}>Added to Cart</Text>
-
             <TouchableOpacity style={styles.buttonContainer} onPress={() => setShowModal(false)}>
               <LinearGradient
                 colors={['#667eea', '#764ba2']}
@@ -215,19 +361,18 @@ const { username, address, title } = route.params || {};
           </View>
         </View>
       </Modal>
-
-
-
     </SafeAreaView>
   );
 };
 
 export default PopularRecipesScreen;
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingBottom:32,
   },
   header: {
     paddingTop: 50,
@@ -449,6 +594,7 @@ loaderText: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    borderRadius: 20,
     paddingVertical: 6,
   },
   addButtonText: {
@@ -474,5 +620,36 @@ emptyImage: {
   height: 150,
   tintColor: '#ccc',
 },
+viewCartWrapper: {
+  position: 'absolute',
+  bottom: 20,
+  left: 20,
+  right: 20,
+  zIndex: 10,
+},
+
+viewCartButton: {
+  borderRadius: 30,
+  overflow: 'hidden',
+},
+
+viewCartGradient: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 12,
+  borderRadius: 30,
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+  elevation: 5,
+},
+
+viewCartText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '600',
+},
+
 
 });

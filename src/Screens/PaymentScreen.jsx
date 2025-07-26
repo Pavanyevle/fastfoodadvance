@@ -15,28 +15,41 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 
-
-
+/**
+ * PaymentScreen
+ * Handles payment method selection and order confirmation.
+ * Features:
+ * - Shows total amount and payment options (currently only Cash on Delivery)
+ * - Displays payment form/info based on selected method
+ * - Handles payment process and shows loader
+ * - Confirms order and saves to Firebase after payment
+ * - Shows confirmation and error modals
+ */
 const PaymentScreen = ({ navigation, route }) => {
+  // State for payment method selection
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  // Card details (not used for COD)
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
+  // UPI and phone (not used for COD)
   const [upiId, setUpiId] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  // Loader for payment process
   const [isProcessing, setIsProcessing] = useState(false);
+  // Modal for order confirmation
   const [confirmationVisible, setConfirmationVisible] = useState(false);
+  // Loader for saving order
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  // Modal for unsupported payment alert
   const [paymentAlertVisible, setPaymentAlertVisible] = useState(false);
 
+  // Order/cart details from navigation params
+  const { totalItems, totalPrice, itemIds, quantities, username, address } = route.params;
 
-
-const { totalItems, totalPrice, itemIds, quantities, username, address } = route.params;
-
-
+  // Payment methods (currently only COD enabled)
   const paymentMethods = [
-
     {
       id: 'cod',
       title: 'Cash on Delivery',
@@ -46,10 +59,7 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
     },
   ];
 
-
-
-
-
+  // If user not logged in, show error and exit
   if (!username) {
     Alert.alert('Error', 'User not logged in');
     setIsSavingOrder(false);
@@ -57,6 +67,11 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
   }
   const userId = username.uid;
 
+  /**
+   * Handle payment button press
+   * - If not COD, show alert (only COD supported)
+   * - If COD, show loader and then confirmation modal
+   */
   const handlePayment = () => {
     if (selectedPaymentMethod !== 'cod') {
       setPaymentAlertVisible(true);
@@ -69,58 +84,62 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
     }, 2000);
   };
 
+  /**
+   * Confirm and save order to Firebase
+   * - Saves each cart item as an order for the user
+   * - Navigates to MainTabs after success
+   */
   const confirmOrder = async () => {
-  setIsSavingOrder(true);
+    setIsSavingOrder(true);
 
-  try {
-    const savePromises = itemIds.map(async (itemId) => {
-      // 🔍 food details Firebase से fetch करो
-      const foodRes = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/${itemId}.json`);
-      const foodData = foodRes.data;
+    try {
+      const savePromises = itemIds.map(async (itemId) => {
+        // Fetch food details from Firebase
+        const foodRes = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/${itemId}.json`);
+        const foodData = foodRes.data;
 
-      const quantity = quantities[itemId] || 1;
-      const totalAmountForItem = foodData.price * quantity;
+        const quantity = quantities[itemId] || 1;
+        const totalAmountForItem = foodData.price * quantity;
 
-      const orderData = {
-        itemId: itemId,
-        name: foodData.name || '',
-        description: foodData.description || '',
-        image: foodData.image || '',
-        price: foodData.price || 0,
-        quantity: quantity,                        // ✅ actual quantity
-        paymentMethod: selectedPaymentMethod,
-        orderTime: new Date().toISOString(),
-        status: 'placed',
-        deliveryTime: '30 mins',
-        address: address,
-        totalAmount: totalAmountForItem,           // ✅ quantity based total
-      };
+        const orderData = {
+          itemId: itemId,
+          name: foodData.name || '',
+          description: foodData.description || '',
+          image: foodData.image || '',
+          price: foodData.price || 0,
+          quantity: quantity,                        // actual quantity
+          paymentMethod: selectedPaymentMethod,
+          orderTime: new Date().toISOString(),
+          status: 'placed',
+          deliveryTime: '30 mins',
+          address: address,
+          totalAmount: totalAmountForItem,           // quantity based total
+        };
 
-     return axios.post(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders.json`,
-        orderData
-      );
-    });
+        return axios.post(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/orders.json`,
+          orderData
+        );
+      });
 
-    await Promise.all(savePromises);
+      await Promise.all(savePromises);
 
-    setIsSavingOrder(false);
-    setConfirmationVisible(false);
-    navigation.replace('MainTabs', {
-      orderId: itemIds,
-      username: username,
-    });
+      setIsSavingOrder(false);
+      setConfirmationVisible(false);
+      navigation.replace('MainTabs', {
+        orderId: itemIds,
+        username: username,
+      });
 
-  } catch (err) {
-    setIsSavingOrder(false);
-    Alert.alert('Error', 'Failed to save order. Try again later.');
-  }
-};
+    } catch (err) {
+      setIsSavingOrder(false);
+      Alert.alert('Error', 'Failed to save order. Try again later.');
+    }
+  };
 
-
-
-
-
+  /**
+   * Render a payment method card
+   */
   const renderPaymentMethodCard = (method) => {
     const isSelected = selectedPaymentMethod === method.id;
 
@@ -155,9 +174,11 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
     );
   };
 
+  /**
+   * Render payment form/info based on selected method
+   */
   const renderPaymentForm = () => {
     switch (selectedPaymentMethod) {
-
       case 'cod':
         return (
           <View style={styles.paymentForm}>
@@ -188,16 +209,17 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
             </View>
           </View>
         );
-
       default:
         return null;
     }
   };
 
+  // Main UI render
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
 
+      {/* Header with back button and title */}
       <LinearGradient
         colors={['#1e293b', '#334155']}
         style={styles.header}
@@ -212,7 +234,9 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
         <View style={styles.headerRight} />
       </LinearGradient>
 
+      {/* Main content: amount, payment methods, and form */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Total amount card */}
         <View style={styles.amountCard}>
           <LinearGradient
             colors={['#6366f1', '#8b5cf6']}
@@ -223,19 +247,21 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
             <Text style={styles.amountDescription}>
               {totalItems} items in your order
             </Text>
-
           </LinearGradient>
         </View>
 
+        {/* Payment method selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Choose Payment Method</Text>
           {paymentMethods.map(renderPaymentMethodCard)}
         </View>
 
+        {/* Payment form/info */}
         <View style={styles.section}>
           {renderPaymentForm()}
         </View>
 
+        {/* Security info */}
         <View style={styles.securityInfo}>
           <Icon name="shield-checkmark" size={20} color="#059669" />
           <Text style={styles.securityText}>
@@ -244,6 +270,7 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
         </View>
       </ScrollView>
 
+      {/* Footer with pay button */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
@@ -256,19 +283,20 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
           >
             {isProcessing ? (
               <View style={styles.processingContainer}>
-                <Icon name="reload" size={20} color="#fff" style={styles.spinning} />
+                <ActivityIndicator size="small" color="#fff" />
                 <Text style={styles.payButtonText}>Processing...</Text>
               </View>
             ) : (
               <>
                 <Icon name="card-outline" size={20} color="#fff" />
-                <Text style={styles.v}>₹{totalPrice.toFixed(2)}</Text>
-
+                <Text style={styles.payButtonText}>₹{totalPrice.toFixed(2)}</Text>
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Modal: Payment success and order confirmation */}
       <Modal
         visible={confirmationVisible}
         transparent
@@ -313,6 +341,8 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
           </View>
         </View>
       </Modal>
+
+      {/* Modal: Alert for unsupported payment methods */}
       <Modal
         visible={paymentAlertVisible}
         transparent
@@ -353,11 +383,23 @@ const { totalItems, totalPrice, itemIds, quantities, username, address } = route
         </View>
       </Modal>
 
-
-
+      {/* Modal: Loader while processing payment */}
+      <Modal
+        visible={isProcessing}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.loaderOverlay}>
+          <View style={styles.loaderBox}>
+            <ActivityIndicator size="large" color="#6366f1" />
+            <Text style={styles.loaderText}>Processing your payment...</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -659,6 +701,28 @@ const styles = StyleSheet.create({
   spinning: {
     transform: [{ rotate: '360deg' }],
   },
+  loaderOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+loaderBox: {
+  backgroundColor: '#fff',
+  padding: 30,
+  borderRadius: 16,
+  alignItems: 'center',
+  width: '80%',
+  elevation: 10,
+},
+loaderText: {
+  marginTop: 16,
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#334155',
+  textAlign: 'center',
+},
+
 });
 
 export default PaymentScreen; 

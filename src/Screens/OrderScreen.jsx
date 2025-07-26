@@ -15,8 +15,13 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
+/**
+ * EmptyCartIllustration
+ * Shows an illustration and message when the cart is empty.
+ */
 const EmptyCartIllustration = () => (
   <View style={{ alignItems: 'center', marginTop: 40 }}>
     <Text style={{ fontSize: 60 }}>🛒</Text>
@@ -24,107 +29,187 @@ const EmptyCartIllustration = () => (
   </View>
 );
 
+/**
+ * OrderScreen
+ * Displays the user's cart, allows editing quantities, removing items, and placing an order.
+ * Features:
+ * - Fetches cart items from Firebase
+ * - Allows quantity adjustment and item removal
+ * - Shows delivery address and summary
+ * - Handles order placement and navigation to payment
+ * - Shows loading and confirmation modals
+ */
 const OrderScreen = ({ navigation, route }) => {
+  // State for delivery address selection
   const [deliveryAddress, setDeliveryAddress] = useState('Home');
+  // State for estimated delivery time
   const [deliveryTime, setDeliveryTime] = useState('30-35 min');
+  // State for cart items
   const [cartItems, setCartItems] = useState([]);
+  // Loading state for cart fetch
   const [loading, setLoading] = useState(true);
+  // Modal state for confirming item deletion
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  // Item id to delete
   const [itemToDelete, setItemToDelete] = useState(null);
+  // Deleting loader state
   const [deleting, setDeleting] = useState(false);
+  // Animation for place order button
   const [scaleAnim] = useState(new Animated.Value(1));
-  const { id, username, address } = route.params;
+  // Food id from route params
+  const { id } = route.params;
+  // Username and address state
+  const [username, setUsername] = useState('');
+  const [address, setAddress] = useState('');
+  // Loader for placing order
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+  // Firebase DB URL
   const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com';
 
+  /**
+   * Fetch quantity for a specific food item in cart
+   */
   const fetchQuantity = async () => {
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-    if (res.data) {
-      const itemKey = Object.keys(res.data).find(
-        key => res.data[key].foodId === id
-      );
-      if (itemKey) {
-        const quantity = res.data[itemKey].quantity;
-        setQuantity(quantity);
-      }
-    }
-  } catch (error) {
-    console.error("Error fetching quantity:", error);
-  }
-};
-const updateQuantity = async (newQty) => {
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-    if (res.data) {
-      const itemKey = Object.keys(res.data).find(
-        key => res.data[key].foodId === id
-      );
-      if (itemKey) {
-        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${itemKey}.json`, {
-          quantity: newQty,
-        });
-        setQuantity(newQty);
-      }
-    }
-  } catch (err) {
-    console.error("Error updating quantity:", err);
-  }
-};
-
-  useEffect(
-
-
-    
-    useCallback(() => {
-      const fetchCartItems = async () => {
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-    if (res.data) {
-      const foodEntries = Object.entries(res.data); // ✅ key-value format
-      const foodDetailsPromises = foodEntries.map(async ([key, value]) => {
-        const foodId = value.foodId;
-        const quantity = value.quantity || 1; // Firebase मधून quantity
-        const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${foodId}.json`);
-        const price = parseInt(foodRes.data.price);
-        return {
-          ...foodRes.data,
-          id: foodId,
-          price,
-          quantity,
-          total: `₹${price * quantity}`,
-        };
-      });
-
-      const foodDetails = await Promise.all(foodDetailsPromises);
-      setCartItems(foodDetails);
-    } else {
-      setCartItems([]);
-    }
-  } catch (error) {
-    console.error("Error fetching cart items:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-       const fetchUserAddress = async () => {
     try {
-      const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-      );
-      if (res.data && res.data.address) {
-        setAddress(res.data.address);  // ✅ address state update
+      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+      if (res.data) {
+        const itemKey = Object.keys(res.data).find(
+          key => res.data[key].foodId === id
+        );
+        if (itemKey) {
+          const quantity = res.data[itemKey].quantity;
+          setQuantity(quantity);
+        }
       }
-    } catch (err) {
-      console.error('Error fetching user address:', err);
+    } catch (error) {
+      console.error("Error fetching quantity:", error);
     }
   };
 
-   fetchUserAddress();
-      fetchCartItems();
-    }, [])
-  );
+  /**
+   * Fetch username and address from AsyncStorage
+   */
+  const fetchUserInfo = async () => {
+    try {
+      const storedUsername = await AsyncStorage.getItem('username');
+      const storedAddress = await AsyncStorage.getItem('address');
+      if (storedUsername) setUsername(storedUsername);
+      if (storedAddress) setAddress(storedAddress);
+    } catch (error) {
+      console.error("❌ Error fetching from AsyncStorage", error);
+    }
+  };
 
+  /**
+   * Update quantity for a cart item in Firebase and local state
+   */
+  const updateQuantity = async (newQty) => {
+    try {
+      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+      if (res.data) {
+        const itemKey = Object.keys(res.data).find(
+          key => res.data[key].foodId === id
+        );
+        if (itemKey) {
+          await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${itemKey}.json`, {
+            quantity: newQty,
+          });
+          setQuantity(newQty);
+        }
+      }
+    } catch (err) {
+      console.error("Error updating quantity:", err);
+    }
+  };
+
+  /**
+   * Fetch cart items, quantity, and address on mount
+   */
+  useEffect(() => {
+    const fetchCartItems = async (user) => {
+      try {
+        const res = await axios.get(`${FIREBASE_DB_URL}/users/${user}/cart.json`);
+        if (res.data) {
+          const foodEntries = Object.entries(res.data);
+          const foodDetailsPromises = foodEntries.map(async ([key, value]) => {
+            const foodId = value.foodId;
+            const quantity = value.quantity || 1;
+            const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${foodId}.json`);
+            const price = parseInt(foodRes.data.price);
+            return {
+              ...foodRes.data,
+              id: foodId,
+              price,
+              quantity,
+              total: `₹${price * quantity}`,
+            };
+          });
+          const foodDetails = await Promise.all(foodDetailsPromises);
+          setCartItems(foodDetails);
+        } else {
+          setCartItems([]);
+        }
+      } catch (error) {
+        console.error("Error fetching cart items:", error);
+      }
+    };
+
+    const fetchQuantity = async (user) => {
+      try {
+        const res = await axios.get(`${FIREBASE_DB_URL}/users/${user}/cart.json`);
+        if (res.data) {
+          const itemKey = Object.keys(res.data).find(
+            key => res.data[key].foodId === id
+          );
+          if (itemKey) {
+            const quantity = res.data[itemKey].quantity;
+            setQuantity(quantity);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching quantity:", error);
+      }
+    };
+
+    const fetchUserAddress = async (user) => {
+      try {
+        const res = await axios.get(`${FIREBASE_DB_URL}/users/${user}.json`);
+        if (res.data && res.data.address) {
+          setAddress(res.data.address);
+        }
+      } catch (err) {
+        console.error('Error fetching user address:', err);
+      }
+    };
+
+    const fetchData = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem('username');
+        const storedAddress = await AsyncStorage.getItem('address');
+
+        if (storedUsername) {
+          setUsername(storedUsername);
+          await fetchCartItems(storedUsername);
+          await fetchQuantity(storedUsername);
+          await fetchUserAddress(storedUsername);
+        }
+        if (storedAddress) {
+          setAddress(storedAddress);
+        }
+      } catch (err) {
+        console.error("❌ Error fetching data from AsyncStorage:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  /**
+   * Handle deleting an item from cart (shows confirmation modal)
+   */
   const handleDeleteItem = async (itemId) => {
     setDeleting(true);
     try {
@@ -148,52 +233,62 @@ const updateQuantity = async (newQty) => {
     }
   };
 
+  /**
+   * Show confirmation modal for deleting an item
+   */
   const confirmDeleteItem = (itemId) => {
     setItemToDelete(itemId);
     setDeleteModalVisible(true);
   };
 
- const handleQuantityChange = async (itemId, change) => {
-  const updatedItems = cartItems.map(item => {
-    if (item.id === itemId) {
-      const newQuantity = Math.max(1, item.quantity + change);
-      const updatedTotal = item.price * newQuantity;
-      return {
-        ...item,
-        quantity: newQuantity,
-        total: `₹${updatedTotal}`,
-      };
-    }
-    return item;
-  });
-
-  setCartItems(updatedItems);
-
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-    if (res.data) {
-      const key = Object.keys(res.data).find(k => res.data[k].foodId === itemId);
-      if (key) {
-        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`, {
-          quantity: updatedItems.find(i => i.id === itemId).quantity,
-        });
+  /**
+   * Handle quantity change for a cart item (updates local and Firebase)
+   */
+  const handleQuantityChange = async (itemId, change) => {
+    const updatedItems = cartItems.map(item => {
+      if (item.id === itemId) {
+        const newQuantity = Math.max(1, item.quantity + change);
+        const updatedTotal = item.price * newQuantity;
+        return {
+          ...item,
+          quantity: newQuantity,
+          total: `₹${updatedTotal}`,
+        };
       }
+      return item;
+    });
+
+    setCartItems(updatedItems);
+
+    try {
+      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+      if (res.data) {
+        const key = Object.keys(res.data).find(k => res.data[k].foodId === itemId);
+        if (key) {
+          await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`, {
+            quantity: updatedItems.find(i => i.id === itemId).quantity,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error updating Firebase quantity:", err);
     }
-  } catch (err) {
-    console.error("Error updating Firebase quantity:", err);
-  }
-};
+  };
 
-
+  // Delivery address options (currently only Home)
   const deliveryAddresses = [
     { id: '1', name: 'Home', address: address, selected: true },
   ];
 
+  // Calculate order summary values
   const subtotal = cartItems.reduce((sum, item) => sum + parseInt(item.total.replace('₹', '')), 0);
   const deliveryFee = 30;
   const tax = Math.round(subtotal * 0.05);
   const total = subtotal + deliveryFee + tax;
 
+  /**
+   * Render a single cart item row
+   */
   const renderCartItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.cartItemBorder} />
@@ -222,40 +317,51 @@ const updateQuantity = async (newQty) => {
     </View>
   );
 
+  /**
+   * Handle placing the order
+   * Shows loader, animates button, and navigates to PaymentScreen
+   */
   const handlePlaceOrder = () => {
-  Animated.sequence([
-    Animated.timing(scaleAnim, {
-      toValue: 0.95,
-      duration: 80,
-      useNativeDriver: true,
-    }),
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      useNativeDriver: true,
-    }),
-  ]).start(() => {
-    const itemIds = cartItems.map(item => item.id); // ✅ All item IDs
-    const quantities = {}; // ✅ id: quantity
-    cartItems.forEach(item => {
-      quantities[item.id] = item.quantity;
+    setIsPlacingOrder(true); // Show loader
+
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      const itemIds = cartItems.map(item => item.id);
+      const quantities = {};
+      cartItems.forEach(item => {
+        quantities[item.id] = item.quantity;
+      });
+
+      // Simulate API delay before navigating to payment
+      setTimeout(() => {
+        setIsPlacingOrder(false);
+        navigation.navigate('PaymentScreen', {
+          totalItems: cartItems.length,
+          totalPrice: total,
+          itemIds: itemIds,
+          quantities: quantities,
+          username: username,
+          address: address,
+        });
+      }, 1000);
     });
+  };
 
-    navigation.navigate('PaymentScreen', {
-      totalItems: cartItems.length,  // ✅ eg: 3 items
-      totalPrice: total,             // ✅ eg: ₹500
-      itemIds: itemIds,              // ✅ eg: ['id1', 'id2']
-      quantities: quantities,        // ✅ eg: { 'id1': 2, 'id2': 1 }
-      username: username,
-      address: address,
-    });
-  });
-};
-
-
+  // Main UI render
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+      {/* Header with back button and title */}
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -268,6 +374,7 @@ const updateQuantity = async (newQty) => {
         </View>
       </LinearGradient>
 
+      {/* Loader while fetching cart */}
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 }}>
           <ActivityIndicator size="large" color="#667eea" />
@@ -279,6 +386,7 @@ const updateQuantity = async (newQty) => {
         <EmptyCartIllustration />
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Cart Items Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Cart Items</Text>
             <FlatList
@@ -290,6 +398,7 @@ const updateQuantity = async (newQty) => {
             />
           </View>
 
+          {/* Delivery Address Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Delivery Address</Text>
             {deliveryAddresses.map(item => (
@@ -312,6 +421,7 @@ const updateQuantity = async (newQty) => {
             ))}
           </View>
 
+          {/* Order Summary Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Order Summary</Text>
             <View style={styles.summaryCard}>
@@ -335,6 +445,7 @@ const updateQuantity = async (newQty) => {
             </View>
           </View>
 
+          {/* Delivery Info and Place Order Button Section */}
           <View style={styles.section}>
             <View style={styles.deliveryInfoCard}>
               <View style={styles.deliveryInfoRow}>
@@ -344,9 +455,7 @@ const updateQuantity = async (newQty) => {
               <View style={styles.deliveryInfoRow}>
                 <Ionicons name="location-outline" size={20} color="#667eea" />
                 <Text style={styles.deliveryInfoText}>Delivery to: {deliveryAddress}</Text>
-
               </View>
-
             </View>
             <View style={styles.section}>
               <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder} activeOpacity={0.8}>
@@ -360,12 +469,12 @@ const updateQuantity = async (newQty) => {
         </ScrollView>
       )}
 
+      {/* Bottom container for animation (currently empty) */}
       <View style={styles.bottomContainer}>
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-
-        </Animated.View>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }} />
       </View>
 
+      {/* Modal for confirming item deletion */}
       <Modal visible={deleteModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -391,11 +500,28 @@ const updateQuantity = async (newQty) => {
           </View>
         </View>
       </Modal>
+
+      {/* Loader modal while placing order */}
+      {isPlacingOrder && (
+        <Modal transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <ActivityIndicator size="large" color="#667eea" />
+              <Text style={{ marginTop: 15, fontSize: 16, color: '#667eea' }}>
+                Placing your order...
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
 
 export default OrderScreen;
+
+// Styles for OrderScreen UI components
+
 
 const styles = StyleSheet.create({
   container: {

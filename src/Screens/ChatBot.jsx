@@ -16,17 +16,37 @@ import axios from 'axios';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 
-const GROQ_API_KEY = 'your-groq-api-key-here'; // Replace with your actual GROQ API key
+// GROQ API key for AI assistant (replace with your own key in production)
+const GROQ_API_KEY = ''; // Replace with your actual GROQ API key
 
+/**
+ * ChatBot screen
+ * Provides a chat interface for users to interact with an AI assistant.
+ * Features:
+ * - Loads/saves chat history from Firebase
+ * - Fetches food menu and user orders for context
+ * - Sends user messages to AI API and displays responses
+ * - Shows typing indicator and handles loading states
+ */
 const ChatBot = ({ navigation, route }) => {
+  // State for chat messages
   const [messages, setMessages] = useState([]);
+  // State for input text
   const [input, setInput] = useState('');
+  // Loading state for AI response
   const [loading, setLoading] = useState(false);
+  // Typing indicator state
   const [isTyping, setIsTyping] = useState(false);
+  // Ref for FlatList to scroll to bottom
   const flatListRef = useRef(null);
+  // Username from navigation params
   const { username } = route.params;
+  // Loading state for chat history
   const [chatLoading, setChatLoading] = useState(true);
 
+  /**
+   * Save a message to Firebase under the user's chat history
+   */
   const saveMessageToFirebase = async (msg) => {
     try {
       const userKey = username.replace('.', '_');
@@ -38,9 +58,13 @@ const ChatBot = ({ navigation, route }) => {
           timestamp: msg.timestamp.toISOString()
         }
       );
-    } catch (err) {}
+    } catch (err) { /* Ignore errors for now */ }
   };
 
+  /**
+   * Fetch available food items from Firebase
+   * Returns a formatted string list of available foods
+   */
   const fetchFoodItems = async () => {
     try {
       const res = await axios.get('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json');
@@ -58,6 +82,9 @@ const ChatBot = ({ navigation, route }) => {
     }
   };
 
+  /**
+   * On mount: fetch chat history from Firebase
+   */
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
@@ -72,6 +99,7 @@ const ChatBot = ({ navigation, route }) => {
           setMessages(messagesArray);
         }
       } catch (error) {
+        // Ignore errors for now
       } finally {
         setChatLoading(false);
       }
@@ -79,6 +107,9 @@ const ChatBot = ({ navigation, route }) => {
     fetchChatHistory();
   }, []);
 
+  /**
+   * Scroll to bottom when messages change
+   */
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => {
@@ -87,6 +118,9 @@ const ChatBot = ({ navigation, route }) => {
     }
   }, [messages]);
 
+  /**
+   * Format messages for GROQ API (user/assistant roles)
+   */
   const formatMessagesForGROQ = (chatMessages) => {
     return chatMessages.map((msg) => ({
       role: msg.sender === 'me' ? 'user' : 'assistant',
@@ -94,6 +128,10 @@ const ChatBot = ({ navigation, route }) => {
     }));
   };
 
+  /**
+   * Fetch user's order history from Firebase
+   * Returns a formatted string list of orders
+   */
   const fetchUserOrders = async () => {
     try {
       const userKey = username.replace('.', '_');
@@ -111,9 +149,13 @@ const ChatBot = ({ navigation, route }) => {
     }
   };
 
+  /**
+   * Send user message to AI, get response, and update chat
+   */
   const sendMessage = async () => {
     if (input.trim() === '') return;
 
+    // Create user message object
     const userMsg = {
       id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-me`,
       text: input,
@@ -129,11 +171,13 @@ const ChatBot = ({ navigation, route }) => {
 
     try {
       let aiText = '';
+      // Fetch live food data and user orders for context
       const [liveFoodData, userOrderData] = await Promise.all([
         fetchFoodItems(),
         fetchUserOrders()
       ]);
 
+      // Call GROQ AI API with chat context and system prompt
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -151,6 +195,8 @@ const ChatBot = ({ navigation, route }) => {
 
                📦 User Orders:
                order time convert IST to Indian time, and proper formating to show order
+               and order display in a list format and show in a proper format,and give the user a list of orders and their details two lines gap for each order,order details on proper format,and show the order details in a list format with two lines gap between each order and give order type symbols like star.
+               
                 ${userOrderData}
 
                🍔 Available Food Menu:
@@ -182,6 +228,7 @@ const ChatBot = ({ navigation, route }) => {
       const data = await response.json();
       aiText = data?.choices?.[0]?.message?.content || 'Sorry, no response.';
 
+      // Create AI message object
       const aiMsg = {
         id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-ai`,
         text: aiText,
@@ -199,10 +246,16 @@ const ChatBot = ({ navigation, route }) => {
     }
   };
 
+  /**
+   * Format timestamp for display (hh:mm)
+   */
   const formatTime = (timestamp) => {
     return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  /**
+   * Render a single chat message bubble
+   */
   const renderItem = ({ item }) => (
     <View style={[styles.messageContainer, item.sender === 'me' ? styles.myMessage : styles.otherMessage]}>
       {item.sender === 'other' && (
@@ -221,6 +274,9 @@ const ChatBot = ({ navigation, route }) => {
     </View>
   );
 
+  /**
+   * Render typing indicator when AI is "typing"
+   */
   const renderTypingIndicator = () => {
     if (!isTyping) return null;
     return (
@@ -239,24 +295,25 @@ const ChatBot = ({ navigation, route }) => {
     );
   };
 
+  // Main UI render
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+      {/* Header with back button and bot info */}
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
-           
             <View>
               <Text style={styles.headerTitle}>Chat Bot</Text>
               <Text style={styles.headerSubtitle}>{isTyping ? 'Typing...' : 'Online'}</Text>
             </View>
           </View>
-         
         </View>
       </LinearGradient>
+      {/* Show loader while loading chat history */}
       {chatLoading ? (
         <View style={styles.chatLoaderContainer}>
           <ActivityIndicator size="large" color="#667eea" />
@@ -275,6 +332,7 @@ const ChatBot = ({ navigation, route }) => {
           {renderTypingIndicator()}
         </View>
       )}
+      {/* Input area for typing and sending messages */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
         <View style={styles.inputContainer}>
           <View style={styles.inputRow}>
@@ -309,6 +367,8 @@ const ChatBot = ({ navigation, route }) => {
 };
 
 export default ChatBot;
+
+
 
 const styles = StyleSheet.create({
   container: {

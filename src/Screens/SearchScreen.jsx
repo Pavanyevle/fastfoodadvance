@@ -16,17 +16,35 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 
-
-const SearchScreen = ({ navigation,route  }) => {
+/**
+ * SearchScreen
+ * Allows users to search for foods by name, filter by category, and sort results.
+ * Features:
+ * - Live search with results from Firebase
+ * - Popular searches for quick access
+ * - Category and filter selection (UI only)
+ * - Navigates to ItemCard for food details
+ */
+const SearchScreen = ({ navigation, route }) => {
+  // State for search query input
   const [searchQuery, setSearchQuery] = useState('');
+  // State for selected category (UI only)
   const [selectedCategory, setSelectedCategory] = useState('All');
+  // State for selected filter (UI only)
   const [selectedFilter, setSelectedFilter] = useState('Popular');
+  // State for showing search results or popular searches
   const [isSearching, setIsSearching] = useState(false);
+  // Ref for search input focus
   const searchInputRef = useRef(null);
+  // Username and address from navigation params
   const { username, address } = route.params;
-const FIREBASE_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json';
+  // Firebase foods endpoint
+  const FIREBASE_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json';
 
-const [searchResults, setSearchResults] = useState([]);
+  // State for search results
+  const [searchResults, setSearchResults] = useState([]);
+
+  // Categories for filtering (UI only)
   const categories = [
     { id: '1', name: 'All', icon: 'restaurant' },
     { id: '2', name: 'Pizza', icon: 'pizza' },
@@ -38,6 +56,7 @@ const [searchResults, setSearchResults] = useState([]);
     { id: '8', name: 'Healthy', icon: 'food-apple' },
   ];
 
+  // Filters for sorting (UI only)
   const filters = [
     { id: '1', name: 'Popular' },
     { id: '2', name: 'Rating' },
@@ -46,60 +65,78 @@ const [searchResults, setSearchResults] = useState([]);
     { id: '5', name: 'Delivery Time' },
   ];
 
+  /**
+   * Fetch search results from Firebase based on query
+   */
   const fetchSearchResults = async (query) => {
-  try {
-    const response = await axios.get(FIREBASE_URL);
-    const data = response.data;
+    try {
+      const response = await axios.get(FIREBASE_URL);
+      const data = response.data;
 
-    if (!data) {
-      setSearchResults([]);
-      return;
+      if (!data) {
+        setSearchResults([]);
+        return;
+      }
+
+      // Filter foods by name (case-insensitive)
+      const filtered = Object.keys(data)
+        .map((key) => ({ id: key, ...data[key] }))
+        .filter((item) =>
+          item.name.toLowerCase().includes(query.toLowerCase())
+        );
+
+      setSearchResults(filtered);
+    } catch (error) {
+      console.error('Search fetch error:', error);
     }
+  };
 
-    // Filter by name
-    const filtered = Object.keys(data)
-      .map((key) => ({ id: key, ...data[key] }))
-      .filter((item) =>
-        item.name.toLowerCase().includes(query.toLowerCase())
-      );
+  /**
+   * Handle search input change
+   * - Updates query and triggers search or clears results
+   */
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setIsSearching(query.length > 0);
 
-    setSearchResults(filtered);
-  } catch (error) {
-    console.error('Search fetch error:', error);
-  }
-};
-const handleSearch = (query) => {
-  setSearchQuery(query);
-  setIsSearching(query.length > 0);
+    if (query.trim().length > 0) {
+      fetchSearchResults(query);
+    } else {
+      setSearchResults([]); // Empty search
+    }
+  };
 
-  if (query.trim().length > 0) {
-    fetchSearchResults(query);
-  } else {
-    setSearchResults([]); // Empty search
-  }
-};
-
+  // List of popular searches for quick access
   const popularSearches = [
     'Pizza', 'Burger', 'Dosa', 'Cake', 'Coffee', 'Biryani', 'Noodles'
   ];
 
+  /**
+   * Focus search input on mount
+   */
   useEffect(() => {
-
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 100);
   }, []);
 
-  
-
+  /**
+   * Handle category selection (UI only)
+   */
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
   };
 
+  /**
+   * Handle filter selection (UI only)
+   */
   const handleFilterSelect = (filter) => {
     setSelectedFilter(filter);
   };
 
+  /**
+   * Render a single category item (UI only)
+   */
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       style={[
@@ -122,6 +159,9 @@ const handleSearch = (query) => {
     </TouchableOpacity>
   );
 
+  /**
+   * Render a single filter item (UI only)
+   */
   const renderFilterItem = ({ item }) => (
     <TouchableOpacity
       style={[
@@ -139,50 +179,59 @@ const handleSearch = (query) => {
     </TouchableOpacity>
   );
 
+  /**
+   * Render a single search result item
+   */
   const renderSearchResult = ({ item }) => (
-  <TouchableOpacity
-    style={styles.resultItem}
-    onPress={() =>
-      navigation.navigate('ItemCard', {
-        id: item.id,
-        username: username,
-        address: address,
-      })
-    }
-  >
-    <Image source={{ uri: item.image }} style={styles.resultImage} />
-    <View style={styles.resultContent}>
-      <View style={styles.resultHeader}>
-        <Text style={styles.resultName}>{item.name}</Text>
-        <View style={styles.vegIndicator}>
-          <View
-            style={[
-              styles.vegDot,
-              { backgroundColor: item.isVeg ? '#4CAF50' : '#f44336' },
-            ]}
-          />
+    <TouchableOpacity
+      style={styles.resultItem}
+      onPress={() =>
+        navigation.navigate('ItemCard', {
+          id: item.id,
+          username: username,
+          address: address,
+        })
+      }
+    >
+      <Image source={{ uri: item.image }} style={styles.resultImage} />
+      <View style={styles.resultContent}>
+        <View style={styles.resultHeader}>
+          <Text style={styles.resultName}>{item.name}</Text>
+          <View style={styles.vegIndicator}>
+            <View
+              style={[
+                styles.vegDot,
+                { backgroundColor: item.isVeg ? '#4CAF50' : '#f44336' },
+              ]}
+            />
+          </View>
         </View>
-      </View>
 
-      <View style={styles.resultInfo}>
-        <View style={styles.ratingContainer}>
-          <Ionicons name="star" size={14} color="#FFD700" />
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-        <View style={styles.deliveryContainer}>
-          <Ionicons name="time-outline" size={14} color="#667eea" />
-          <Text style={styles.deliveryText}>{item.deliveryTime}</Text>
-        </View>
-      </View>
+        {/* Description, restaurant, offers, and stock info */}
+        {item.description && (
+          <Text style={styles.descriptionText}>{item.description}</Text>
+        )}
 
-      <View style={styles.resultFooter}>
-        <Text style={styles.categoryTag}>{item.category}</Text>
-        <Text style={styles.priceText}>{item.price}</Text>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
+        {item.restaurantName && (
+          <Text style={styles.restaurantText}>By {item.restaurantName}</Text>
+        )}
 
+        {item.offers && (
+          <Text style={styles.offerText}>{item.offers}</Text>
+        )}
+
+        {item.isAvailable === false && (
+          <Text style={styles.outOfStockText}>Out of Stock</Text>
+        )}
+
+        <Text style={styles.priceText}>₹{item.price}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  /**
+   * Render a single popular search chip
+   */
   const renderPopularSearch = ({ item }) => (
     <TouchableOpacity
       style={styles.popularSearchItem}
@@ -192,11 +241,12 @@ const handleSearch = (query) => {
     </TouchableOpacity>
   );
 
+  // Main UI render
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
 
-      {/* Header */}
+      {/* Header with back button and search input */}
       <LinearGradient
         colors={['#667eea', '#764ba2']}
         style={styles.header}
@@ -227,40 +277,41 @@ const handleSearch = (query) => {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
+
+        {/* Show search results if searching, else show popular searches */}
         {isSearching ? (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Search Results</Text>
-    {searchResults.length > 0 ? (
-      <FlatList
-        data={searchResults}
-        renderItem={renderSearchResult}
-        keyExtractor={item => item.id}
-        scrollEnabled={false}
-        contentContainerStyle={styles.resultsContainer}
-      />
-    ) : (
-      <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>
-        No results found.
-      </Text>
-    )}
-  </View>
-) : (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Popular Searches</Text>
-    <View style={styles.popularSearchesContainer}>
-      {popularSearches.map((search, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.popularSearchItem}
-          onPress={() => handleSearch(search)}
-        >
-          <Text style={styles.popularSearchText}>{search}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  </View>
-)}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Search Results</Text>
+            {searchResults.length > 0 ? (
+              <FlatList
+                data={searchResults}
+                renderItem={renderSearchResult}
+                keyExtractor={item => item.id}
+                scrollEnabled={false}
+                contentContainerStyle={styles.resultsContainer}
+              />
+            ) : (
+              <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>
+                No results found.
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Popular Searches</Text>
+            <View style={styles.popularSearchesContainer}>
+              {popularSearches.map((search, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.popularSearchItem}
+                  onPress={() => handleSearch(search)}
+                >
+                  <Text style={styles.popularSearchText}>{search}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -470,6 +521,7 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginTop: 10,
     color: '#2d3436',
   },
   popularSearchesContainer: {
@@ -491,4 +543,30 @@ const styles = StyleSheet.create({
     color: '#667eea',
     fontWeight: '500',
   },
+  descriptionText: {
+    fontSize: 13,
+    color: '#636e72',
+    marginTop: 5,
+  },
+
+  restaurantText: {
+    fontSize: 12,
+    color: '#b2bec3',
+    fontStyle: 'italic',
+  },
+
+  offerText: {
+    fontSize: 13,
+    color: '#d63031',
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+
+  outOfStockText: {
+    fontSize: 13,
+    color: '#e17055',
+    marginTop: 5,
+    fontWeight: 'bold',
+  },
+
 }); 

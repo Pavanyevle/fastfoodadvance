@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
   Modal,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -18,24 +19,44 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 
+/**
+ * ProfileScreen
+ * Displays user profile info, notifications, and menu options.
+ * Features:
+ * - Fetches user email, image, and notification count from Firebase
+ * - Shows profile image, name, email, and activity button
+ * - Shows menu for profile settings, orders, help, and sign out
+ * - Handles sign out with confirmation modal
+ * - Updates notification count in real-time
+ */
 const ProfileScreen = ({ navigation, route }) => {
   const isFocused = useIsFocused();
 
+  // Username and address from navigation params
   const { username } = route.params;
   const { address } = route.params;
+
+  // State for profile image URL
   const [imageUrl, setImageUrl] = useState('');
-
-
+  // State for sign out loader
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  // State for email fetched from DB
   const [dbEmail, setDbEmail] = useState('');
-  const name = username || 'User';
+  // State for notification badge count
   const [notificationCount, setNotificationCount] = useState(0);
-
+  // State for selected image (not used here)
   const [selectedImage, setSelectedImage] = useState('');
+  // State for full profile data from DB
   const [profileData, setProfileData] = useState({});
-
-
+  // State for sign out confirmation modal
   const [modalVisible, setModalVisible] = useState(false);
 
+  // User display name
+  const name = username || 'User';
+
+  /**
+   * Fetch user email and profile image from Firebase
+   */
   const fetchEmail = async () => {
     try {
       const res = await axios.get(
@@ -55,6 +76,10 @@ const ProfileScreen = ({ navigation, route }) => {
       setImageUrl('');
     }
   };
+
+  /**
+   * Fetch unread notification count from Firebase
+   */
   const fetchNotificationCount = async () => {
     try {
       const res = await axios.get(
@@ -63,11 +88,9 @@ const ProfileScreen = ({ navigation, route }) => {
       const data = res.data;
 
       if (data) {
-        
         const unreadNotifications = Object.values(data).filter(
           n => typeof n.isRead !== 'undefined' && n.isRead === false
         );
-
         const count = unreadNotifications.length;
         setNotificationCount(count);
       } else {
@@ -79,8 +102,9 @@ const ProfileScreen = ({ navigation, route }) => {
     }
   };
 
-
-
+  /**
+   * On focus: fetch profile info and poll notification count
+   */
   useEffect(() => {
     let interval;
     if (isFocused) {
@@ -88,26 +112,34 @@ const ProfileScreen = ({ navigation, route }) => {
       fetchNotificationCount();
       interval = setInterval(fetchNotificationCount, 1000);
     }
-
     return () => {
       clearInterval(interval); 
     };
   }, [isFocused]); 
 
-
-
-
-
+  /**
+   * Handle user sign out
+   * - Removes username and address from AsyncStorage
+   * - Navigates to Welcome screen
+   */
   const handleSignOut = async () => {
     try {
+      setIsSigningOut(true); // Show loader
       await AsyncStorage.removeItem('username');
       await AsyncStorage.removeItem('address');
-      navigation.replace('Welcome');
+      setTimeout(() => {
+        setIsSigningOut(false); // Hide loader
+        navigation.replace('Welcome');
+      }, 1000); // Delay for smooth UX
     } catch (error) {
       console.error('Sign out error:', error);
+      setIsSigningOut(false);
     }
   };
 
+  /**
+   * Profile menu item component
+   */
   const ProfileItem = ({ icon, text, bg, onPress, badge }) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <LinearGradient colors={[bg, bg + 'CC']} style={styles.menuItemGradient}>
@@ -129,9 +161,11 @@ const ProfileScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
+  // Main UI render
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#4F46E5" barStyle="light-content" />
+      {/* Header with back and notification buttons */}
       <LinearGradient colors={['#6C63FF', '#3F2B96']} style={styles.headerGradient}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -147,19 +181,19 @@ const ProfileScreen = ({ navigation, route }) => {
             }
           >
             <Ionicons name="notifications-outline" size={24} color="#fff" />
-
-            
+            {/* Notification badge if unread notifications exist */}
             {notificationCount > 0 && (
               <View style={styles.notificationBadge}>
                 <Text style={styles.badgeText}>{notificationCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-
         </View>
       </LinearGradient>
 
+      {/* Profile info and menu */}
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Profile image, name, email, and activity button */}
         <View style={styles.profileSection}>
           <View style={styles.profileImageContainer}>
             <Image
@@ -189,14 +223,15 @@ const ProfileScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Menu options */}
         <View style={styles.menuContainer}>
           <ProfileItem icon="cog" text="Profile Settings" bg="#6366F1" onPress={() => navigation.navigate('ProfileSettingsScreen', { username: name })}
           />
           <ProfileItem icon="history" text="My Orders" bg="#14B8A6" onPress={() => navigation.navigate('OrderHistoryScreen', { username: name })} />
-
           <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('ChatBot', { username: name })} />
         </View>
 
+        {/* Sign out button */}
         <TouchableOpacity style={styles.signOutContainer} onPress={() => setModalVisible(true)}>
           <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.signOutGradient}>
             <Ionicons name="log-out-outline" size={20} color="#fff" />
@@ -205,7 +240,7 @@ const ProfileScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </ScrollView>
 
-
+      {/* Modal for sign out confirmation */}
       <Modal
         transparent
         visible={modalVisible}
@@ -216,26 +251,31 @@ const ProfileScreen = ({ navigation, route }) => {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Sign Out</Text>
             <Text style={styles.modalMessage}>Are you sure you want to sign out?</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#E5E7EB' }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={{ color: '#1F2937' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#DC2626' }]}
-                onPress={handleSignOut}
-              >
-                <Text style={{ color: '#fff' }}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
+            {isSigningOut ? (
+              <ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 20 }} />
+            ) : (
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#E5E7EB' }]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={{ color: '#1F2937' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#DC2626' }]}
+                  onPress={handleSignOut}
+                >
+                  <Text style={{ color: '#fff' }}>Sign Out</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   // 🔹 Container

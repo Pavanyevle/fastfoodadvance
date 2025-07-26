@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRef } from 'react'; 
 import {
   View,
   Text,
@@ -13,6 +14,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Modal,
   PermissionsAndroid
 } from 'react-native';
 import { useEffect, useState } from 'react';
@@ -31,30 +33,32 @@ import Feather from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 
 
+// Get device width for responsive UI
 const { width } = Dimensions.get('window');
 
+// Firebase Realtime Database URL
 const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/';
 
+// Main Home Screen Component
 const Home = ({ navigation, route }) => {
-  const [foods, setFoods] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [greeting, setGreeting] = useState('');
-  const [username, setUsername] = useState('');
-  const [address, setAddress] = useState('');
-  const [latestOffers, setLatestOffers] = useState([]);
-  const [profileImage, setProfileImage] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [profileData, setProfileData] = useState({});
-  const isFocused = useIsFocused();
+  // State variables
+  const [foods, setFoods] = useState([]); // All food items
+  const [loading, setLoading] = useState(true); // Loader state
+  const [greeting, setGreeting] = useState(''); // Greeting message
+  const [username, setUsername] = useState(''); // Current user
+  const [address, setAddress] = useState(''); // User address
+  const [latestOffers, setLatestOffers] = useState([]); // Latest offers
+  const [profileImage, setProfileImage] = useState(null); // Profile image
+  const [selectedImage, setSelectedImage] = useState(null); // Selected profile image
+  const [profileData, setProfileData] = useState({}); // Full profile data
+  const isFocused = useIsFocused(); // Navigation focus state
+  
+  // Ref for geolocation watch
+  const watchIdRef = useRef(null); 
 
+  const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
 
-
-
-
-  const [notificationCount, setNotificationCount] = useState(0);
-
-
-
+  // Fetch unread notification count from DB
   const fetchNotificationCount = async () => {
     try {
       const res = await axios.get(
@@ -74,6 +78,7 @@ const Home = ({ navigation, route }) => {
     }
   };
 
+  // Fetch all foods from Firebase
   const fetchFoods = async () => {
     try {
       const response = await axios.get(`${FIREBASE_DB_URL}/foods.json`);
@@ -94,7 +99,7 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-
+  // Load user data (username, address, profile image, etc.)
   const loadUserData = async () => {
     try {
       const storedUsername = await AsyncStorage.getItem('username');
@@ -103,7 +108,7 @@ const Home = ({ navigation, route }) => {
       if (storedUsername) {
         setUsername(storedUsername);
 
-        // 🔄 Profile image + email load
+        // Fetch profile image and other user data
         const userRes = await axios.get(`${FIREBASE_DB_URL}/users/${storedUsername}.json`);
         const userData = userRes.data;
 
@@ -119,61 +124,95 @@ const Home = ({ navigation, route }) => {
     }
   };
 
+  // Location permission and address update logic
+  useEffect(() => {
+    // Request location permission (Android)
+    const requestLocationPermission = async () => {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'This app needs access to your location.',
+            buttonPositive: 'Allow',
+            buttonNegative: 'Deny',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    };
 
-  const getCurrentLocation = async () => {
-    try {
-      const permission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
-
-      if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+    // Start watching user location and update address
+    const startWatchingLocation = async () => {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
         console.log('❌ Location permission denied');
         return;
       }
 
-      Geolocation.getCurrentPosition(
+      watchIdRef.current = Geolocation.watchPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
+          console.log('📍 Location:', latitude, longitude);
 
-          const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-            params: {
-              lat: latitude,
-              lon: longitude,
-              format: 'json'
+          try {
+            // Reverse geocode to get address
+            const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+              params: {
+                lat: latitude,
+                lon: longitude,
+                format: 'json',
+              },
+              headers: {
+                'User-Agent': 'ReactNativeApp/1.0 (pavanyevle6@gmail.com)',
+                'Accept-Language': 'en',
+              },
+            });
+
+            const currentAddress = response.data?.display_name || 'Unknown Address';
+            console.log('📦 Got Address:', currentAddress);
+            setAddress(currentAddress);
+
+            // Update address in Firebase and AsyncStorage
+            const storedUsername = await AsyncStorage.getItem('username');
+            if (storedUsername) {
+              await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
+                address: currentAddress,
+              });
             }
-          });
 
-
-          const currentAddress = response.data?.display_name || 'Unknown Address';
-
-          setAddress(currentAddress); // ✅ UI के लिए
-
-          // 🔄 Firebase में Save करो
-          const username = await AsyncStorage.getItem('username');
-          if (username) {
-            const url = `${FIREBASE_DB_URL}/users/${username}.json`;
-            await axios.patch(url, { address: currentAddress });
+            await AsyncStorage.setItem('address', currentAddress);
+          } catch (error) {
+            console.log('❌ Error getting address:', error.message);
           }
-
-          // 🔄 AsyncStorage में भी Save करो
-          await AsyncStorage.setItem('address', currentAddress);
-
-          console.log('📍 Address Updated:', currentAddress);
         },
         (error) => {
-          console.log('❌ Location error:', error.message);
+          console.log('❌ watchPosition error:', error.message);
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        {
+          enableHighAccuracy: true,
+          distanceFilter: 10,
+          interval: 10000,
+          fastestInterval: 5000,
+        }
       );
-    } catch (error) {
-      console.log('❌ Location fetch failed:', error.message);
-    }
-  };
+    };
 
+    startWatchingLocation();
 
+    // Cleanup geolocation watch on unmount
+    return () => {
+      if (watchIdRef.current !== null) {
+        Geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
 
-
-
+  // Static food categories for horizontal scroll
   const foodItems = [
     { id: '1', name: 'Burger', image: require('../img/burger.jpeg'), icon: 'hamburger' },
     { id: '2', name: 'Pizza', image: require('../img/pizza.jpg'), icon: 'pizza' },
@@ -183,10 +222,7 @@ const Home = ({ navigation, route }) => {
     { id: '6', name: 'Drinks', image: require('../img/burger.jpeg'), icon: 'cup-water' },
   ];
 
-
-
-
-
+  // Static promo slides for Swiper
   const promoSlides = [
     {
       title1: 'Get 50% OFF',
@@ -240,23 +276,23 @@ const Home = ({ navigation, route }) => {
     },
   ];
 
-
+  // Render a single food category item
   const renderFoodItem = ({ item }) => (
-  <TouchableOpacity
-    style={styles.foodItem}
-    onPress={() => navigation.navigate('PopularRecipesScreen', { title: item.name })}  // <-- navigation इथे वापरलं
-  >
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.foodItemGradient}
+    <TouchableOpacity
+      style={styles.foodItem}
+      onPress={() => navigation.navigate('PopularRecipesScreen', { title: item.name, username: username, address: address })}
     >
-      <MaterialCommunityIcons name={item.icon} size={30} color="#fff" />
-    </LinearGradient>
-    <Text style={styles.foodName}>{item.name}</Text>
-  </TouchableOpacity>
-);
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        style={styles.foodItemGradient}
+      >
+        <MaterialCommunityIcons name={item.icon} size={30} color="#fff" />
+      </LinearGradient>
+      <Text style={styles.foodName}>{item.name}</Text>
+    </TouchableOpacity>
+  );
 
-
+  // Render a single popular recipe card
   const renderPopularRecipe = ({ item }) => {
     console.log("📸 Image URL:", item.image);
 
@@ -298,6 +334,7 @@ const Home = ({ navigation, route }) => {
     );
   };
 
+  // Render a single latest offer card
   const renderLatestOffer = ({ item }) => (
     <TouchableOpacity style={styles.offerCard}>
       <Image source={{ uri: item.image }} style={styles.offerImage} />
@@ -317,9 +354,7 @@ const Home = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-
-
-
+  // Fetch latest offers and merge with food data
   const fetchLatestOffers = async () => {
     try {
       const offerRes = await axios.get(`${FIREBASE_DB_URL}/offers.json`);
@@ -331,6 +366,7 @@ const Home = ({ navigation, route }) => {
           ...offerData[key],
         }));
 
+        // Merge offer with food details
         const combinedData = await Promise.all(
           offersArray.map(async offer => {
             const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${offer.foodId}.json`);
@@ -354,6 +390,8 @@ const Home = ({ navigation, route }) => {
       console.log('❌ Error fetching latest offers:', err.message);
     }
   };
+
+  // Main effect: set greeting, load user/foods/offers/notifications on focus
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good Morning !');
@@ -361,214 +399,209 @@ const Home = ({ navigation, route }) => {
     else setGreeting('Good Evening !');
 
     if (isFocused) {
-      loadUserData(); // 🔄 Profile + Address
-      fetchFoods();    // 🔄 Food Items
-      fetchLatestOffers(); // 🔄 Offers
-      fetchNotificationCount(); // 🔄 Notification
-      getCurrentLocation(); // 🔄 Location
+      loadUserData(); // Load profile + address
+      fetchFoods();    // Load food items
+      fetchLatestOffers(); // Load offers
+      fetchNotificationCount(); // Load notifications
     }
   }, [isFocused]);
 
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#667eea" />
-        <Text style={{ marginTop: 10, fontSize: 16, color: '#667eea' }}>
-          Loading...
-        </Text>
-      </View>
-    );
-  }
-
+  // Main UI render
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
 
-      {/* Header */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.userSection}>
-            <TouchableOpacity
-              style={styles.profileImageContainer}
-              onPress={() =>
-                navigation.navigate('Profile', { username: username, address: address })
-              }
-            >
-              <Image
-                source={
-                  selectedImage
-                    ? { uri: selectedImage }
-                    : profileData.image
-                      ? { uri: profileData.image }
-                      : require('../img/profile.png')
-                }
-                style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.userInfo}>
-              <Text style={styles.greeting}>{greeting}</Text>
-              <View style={{
-                width: 100,
-                height: 25,
-                overflow: 'hidden',
-                alignSelf: 'center',
-              }}>
-                <Text style={styles.username}>{username}</Text>
-              </View>
+      {/* Loader Modal while loading */}
+      {loading && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.loaderOverlay}>
+            <View style={styles.loaderBox}>
+              <ActivityIndicator size="large" color="#667eea" />
+              <Text style={styles.loaderText}>Loading your dashboard...</Text>
             </View>
           </View>
+        </Modal>
+      )}
 
-          <View style={styles.headerActions}>
-            <View style={styles.fixedWrapper}>
-              <TouchableOpacity style={styles.locationBtn}>
-                <EvilIcons name="location" size={20} color="#fff" />
-                <Text
-                  style={styles.locationText}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
+      {/* Main content when not loading */}
+      {!loading && (
+        <>
+          {/* Header with profile, greeting, address, notifications */}
+          <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
+            <View style={styles.headerContent}>
+              <View style={styles.userSection}>
+                <TouchableOpacity
+                  style={styles.profileImageContainer}
+                  onPress={() =>
+                    navigation.navigate('Profile', { username, address })
+                  }
                 >
-                  Nashik Road, Maharashtra, India 422101
-                </Text>
+                  <Image
+                    source={
+                      selectedImage
+                        ? { uri: selectedImage }
+                        : profileData.image
+                          ? { uri: profileData.image }
+                          : require('../img/profile.png')
+                    }
+                    style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.userInfo}>
+                  <Text style={styles.greeting}>{greeting}</Text>
+                  <View
+                    style={{
+                      width: 100,
+                      height: 25,
+                      overflow: 'hidden',
+                      alignSelf: 'center',
+                    }}
+                  >
+                    <Text style={styles.username}>{username}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.headerActions}>
+                <View style={styles.fixedWrapper}>
+                  <TouchableOpacity style={styles.locationBtn}>
+                    <EvilIcons name="location" size={20} color="#fff" />
+                    <Text
+                      style={styles.locationText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {address || 'Fetching address...'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.notificationBtn}
+                  onPress={() =>
+                    navigation.navigate('NotificationScreen', { username, address })
+                  }
+                >
+                  <Ionicons name="notifications-outline" size={24} color="#fff" />
+                  {notificationCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.badgeText}>{notificationCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Main Scrollable Content */}
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Search Bar */}
+            <View style={styles.searchSection}>
+              <TouchableOpacity
+                style={styles.searchContainer}
+                onPress={() =>
+                  navigation.navigate('SearchScreen', { username, address })
+                }
+              >
+                <Feather name="search" size={20} color="#667eea" />
+                <Text style={styles.searchPlaceholder}>Search foods...</Text>
               </TouchableOpacity>
             </View>
 
-
-
-            <TouchableOpacity
-              style={styles.notificationBtn}
-              onPress={() =>
-                navigation.navigate('NotificationScreen', {
-                  username: username,
-                  address: address,
-                })
-              }
-            >
-              <Ionicons name="notifications-outline" size={24} color="#fff" />
-              {/* 🔻 Badge तभी दिखे जब count > 0 */}
-              {notificationCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.badgeText}>{notificationCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-          </View>
-        </View>
-      </LinearGradient>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Section */}
-        <View style={styles.searchSection}>
-          <TouchableOpacity
-            style={styles.searchContainer}
-            onPress={() =>
-              navigation.navigate('SearchScreen', {
-                username: username,
-                address: address,
-              })
-            }
-          >
-            <Feather name="search" size={20} color="#667eea" />
-            <Text style={styles.searchPlaceholder}>Search foods...</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Promotional Slider */}
-        <View style={styles.sliderContainer}>
-          <Swiper
-            autoplay
-            autoplayTimeout={4}
-            showsPagination={true}
-            dotColor="rgba(255,255,255,0.5)"
-            activeDotColor="#fff"
-            paginationStyle={styles.pagination}
-          >
-            {promoSlides.map((item, index) => (
-              <View key={index} style={styles.slideContainer}>
-                <LinearGradient
-                  colors={item.bgColor}
-                  style={styles.promoCard}
-                >
-                  <View style={styles.promoContent}>
-                    <View style={styles.promoTextContainer}>
-                      <Text style={styles.promoTitle}>{item.title1}</Text>
-                      <Text style={styles.promoSubtitle}>{item.title2}</Text>
-                      <Text style={styles.promoDesc}>{item.subtitle}</Text>
-                    
-                    </View>
-                    {item.image && (
-                      <Image source={item.image} style={styles.promoImage} />
-                    )}
+            {/* Promo Swiper */}
+            <View style={styles.sliderContainer}>
+              <Swiper
+                autoplay
+                autoplayTimeout={4}
+                showsPagination={true}
+                dotColor="rgba(255,255,255,0.5)"
+                activeDotColor="#fff"
+                paginationStyle={styles.pagination}
+              >
+                {promoSlides.map((item, index) => (
+                  <View key={index} style={styles.slideContainer}>
+                    <LinearGradient colors={item.bgColor} style={styles.promoCard}>
+                      <View style={styles.promoContent}>
+                        <View style={styles.promoTextContainer}>
+                          <Text style={styles.promoTitle}>{item.title1}</Text>
+                          <Text style={styles.promoSubtitle}>{item.title2}</Text>
+                          <Text style={styles.promoDesc}>{item.subtitle}</Text>
+                        </View>
+                        {item.image && (
+                          <Image source={item.image} style={styles.promoImage} />
+                        )}
+                      </View>
+                    </LinearGradient>
                   </View>
-                </LinearGradient>
+                ))}
+              </Swiper>
+            </View>
+
+            {/* Food Categories Horizontal List */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Food Categories</Text>
               </View>
-            ))}
-          </Swiper>
-        </View>
+              <FlatList
+                horizontal
+                data={foodItems}
+                renderItem={renderFoodItem}
+                keyExtractor={(item) => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesList}
+              />
+            </View>
 
-        {/* Categories Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Food Categories</Text>
+            {/* Popular Recipes Horizontal List */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Popular Recipes</Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PopularRecipesScreen', { username, address })
+                  }
+                >
+                  <Text style={styles.seeMore}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                horizontal
+                data={foods}
+                renderItem={renderPopularRecipe}
+                keyExtractor={(item) => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recipesList}
+              />
+            </View>
 
-          </View>
-          <FlatList
-            horizontal
-            data={foodItems}
-            renderItem={renderFoodItem}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-
-        {/* Popular Recipes Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Popular Recipes</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('PopularRecipesScreen', { username: username, address: address })}
-            >
-              <Text style={styles.seeMore}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            horizontal
-            data={foods}
-            renderItem={renderPopularRecipe}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.recipesList}
-          />
-        </View>
-
-        {/* Latest Offers Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Latest Offers</Text>
-
-          </View>
-          <FlatList
-            horizontal
-            data={latestOffers}
-            renderItem={renderLatestOffer}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.offersList}
-          />
-
-        </View>
-      </ScrollView>
+            {/* Latest Offers Horizontal List */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Latest Offers</Text>
+              </View>
+              <FlatList
+                horizontal
+                data={latestOffers}
+                renderItem={renderLatestOffer}
+                keyExtractor={(item) => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.offersList}
+              />
+            </View>
+          </ScrollView>
+        </>
+      )}
     </View>
   );
+
 };
 
 export default Home;
+
+
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -715,7 +748,7 @@ const styles = StyleSheet.create({
   },
   slideContainer: {
     paddingHorizontal: 20,
-    
+
   },
   promoCard: {
     borderRadius: 20,
@@ -804,10 +837,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-  
-   
-    
-    
+
+
+
+
   },
   foodName: {
     fontSize: 12,
@@ -817,7 +850,7 @@ const styles = StyleSheet.create({
   },
   recipesList: {
     paddingHorizontal: 20,
-    marginBottom:10,
+    marginBottom: 10,
   },
   popularCard: {
     width: 200,
@@ -915,7 +948,7 @@ const styles = StyleSheet.create({
   },
   offersList: {
     paddingHorizontal: 20,
-    marginBottom:10,
+    marginBottom: 10,
   },
   offerCard: {
     width: 220,
@@ -981,4 +1014,52 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#667eea',
   },
+  loaderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+
+  loaderBox: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    width: '80%',
+    elevation: 10,
+  },
+
+  loaderText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  loaderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loaderBox: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    width: '80%',
+    elevation: 10,
+  },
+  loaderText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
+
+
 });

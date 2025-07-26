@@ -9,20 +9,41 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  ActivityIndicator,
   Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 
+/**
+ * OrderHistoryScreen
+ * Shows a list of all orders placed by the user.
+ * Features:
+ * - Fetches order history from Firebase
+ * - Displays order details and status
+ * - Allows user to cancel pending/processing orders
+ * - Shows order details in a modal
+ * - Allows user to track order status
+ * - Polls for order updates every 4 seconds
+ */
 const OrderHistoryScreen = ({ navigation, route }) => {
+  // Get username from navigation params
   const { username } = route.params;
+  // State for all orders
   const [orders, setOrders] = useState([]);
+  // Loading state for fetching orders
   const [loading, setLoading] = useState(true);
+  // State for currently selected order (for modal)
   const [selectedOrder, setSelectedOrder] = useState(null);
+  // State for showing cancel confirmation modal
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // State for order id to cancel
   const [cancelOrderId, setCancelOrderId] = useState(null);
 
+  /**
+   * Get color for order status badge
+   */
   const getStatusColor = (s) =>
     ({
       delivered: '#059669',
@@ -31,6 +52,10 @@ const OrderHistoryScreen = ({ navigation, route }) => {
       cancelled: '#dc2626',
     }[s] || '#64748b');
 
+  /**
+   * Cancel an order by updating its status in Firebase
+   * Updates local state after successful cancellation
+   */
   const cancelOrder = async (orderId) => {
     try {
       await axios.patch(
@@ -52,6 +77,10 @@ const OrderHistoryScreen = ({ navigation, route }) => {
     }
   };
 
+  /**
+   * Poll for order updates every 4 seconds
+   * Fetches latest orders from Firebase and updates state
+   */
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -78,9 +107,13 @@ const OrderHistoryScreen = ({ navigation, route }) => {
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Render a single order card in the list
+   */
   const renderOrder = ({ item }) => (
     <TouchableOpacity style={styles.card} onPress={() => setSelectedOrder(item)}>
       <LinearGradient colors={['#fff', '#f8fafc']} style={styles.cardInner}>
+        {/* Order ID and payment method */}
         <View style={styles.row}>
           <Text style={styles.orderId}>Order ID: {item.id}</Text>
           <Text style={[styles.method, { color: getStatusColor(item.status) }]}>
@@ -88,6 +121,7 @@ const OrderHistoryScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
+        {/* Food image, name, description, and status badge */}
         <View style={styles.rowCenter}>
           <Image
             source={{ uri: item.image || 'https://via.placeholder.com/60' }}
@@ -123,12 +157,13 @@ const OrderHistoryScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* Amount and order date */}
         <View style={styles.row}>
-          
-  <Text style={styles.amount}>₹{item.totalAmount || item.price}</Text>
+          <Text style={styles.amount}>₹{item.totalAmount || item.price}</Text>
           <Text style={styles.date}>{new Date(item.orderTime).toLocaleDateString()}</Text>
         </View>
 
+        {/* Cancel button for eligible orders */}
         {item.status !== 'cancelled' && item.status !== 'delivered' && (
           <TouchableOpacity
             onPress={() => {
@@ -143,13 +178,12 @@ const OrderHistoryScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-  if (loading)
-    return <Text style={{ flex: 1, textAlign: 'center', marginTop: 50 }}>Loading...</Text>;
-
+  // Main UI render
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
 
+      {/* Header with back button and title */}
       <LinearGradient colors={['#1e293b', '#334155']} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color="#fff" />
@@ -158,6 +192,7 @@ const OrderHistoryScreen = ({ navigation, route }) => {
         <View style={{ width: 24 }} />
       </LinearGradient>
 
+      {/* Orders list */}
       <FlatList
         contentContainerStyle={{ padding: 16 }}
         data={orders}
@@ -194,6 +229,7 @@ const OrderHistoryScreen = ({ navigation, route }) => {
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Order Details</Text>
             <ScrollView>
+              {/* Food image and details */}
               <Image
                 source={{ uri: selectedOrder.image || 'https://via.placeholder.com/100' }}
                 style={{
@@ -219,16 +255,17 @@ const OrderHistoryScreen = ({ navigation, route }) => {
                 Status: {selectedOrder.status}
               </Text>
               <Text>Quantity: {selectedOrder.quantity}</Text>
-
               <Text>Total Amount: ₹{selectedOrder.totalAmount}</Text>
               <Text>Date: {new Date(selectedOrder.orderTime).toLocaleString()}</Text>
               <Text style={{ marginTop: 4 }}>Address: {selectedOrder.address}</Text>
             </ScrollView>
 
+            {/* Close button for modal */}
             <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.closeBtn}>
               <Text style={{ color: '#fff' }}>Close</Text>
             </TouchableOpacity>
 
+            {/* Track order button */}
             <TouchableOpacity
               style={styles.trackBtn}
               onPress={() => {
@@ -244,10 +281,25 @@ const OrderHistoryScreen = ({ navigation, route }) => {
           </View>
         </View>
       )}
+
+      {/* Loader modal while fetching orders */}
+      {loading && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.loaderOverlay}>
+            <View style={styles.loaderBox}>
+              <View style={{ alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#6366f1" />
+                <Text style={styles.loaderText}>Loading your orders...</Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
 
+// Styles for OrderHistoryScreen UI components
 const styles = StyleSheet.create({
   header: {
     paddingTop: 60,
@@ -390,6 +442,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-end',
     marginRight: 4,
+  },
+  loaderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderBox: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    width: '80%',
+    elevation: 10,
+  },
+  loaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
   },
 });
 

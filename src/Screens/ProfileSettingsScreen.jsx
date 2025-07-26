@@ -19,9 +19,15 @@ import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
+/**
+ * ProfileSettingsScreen
+ * Allows user to view and edit profile, change password, logout, and delete account.
+ */
 const ProfileSettingsScreen = ({ navigation, route }) => {
+  // Get username from navigation params
   const { username } = route.params;
+
+  // State for password modal and fields
   const [passwordModal, setPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,37 +36,101 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
-
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  
+  // Modal for showing success/error messages
+  const [messageModal, setMessageModal] = useState({
+    visible: false,
+    type: '',
+    message: '',
+  });
 
+  // Profile data state
+  const [profileData, setProfileData] = useState({
+    name: 'John Doe',
+    email: 'john.doe@example.com',
+    phone: '+91 98765 43210',
+    address: '123 Main Street, City, State 12345',
+  });
+
+  // Settings state (not implemented in UI)
+  const [settings, setSettings] = useState({
+    notifications: true,
+    emailUpdates: false,
+    darkMode: false,
+    locationServices: true,
+    biometricAuth: true,
+  });
+
+  // Editing state for profile info
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempData, setTempData] = useState({ ...profileData });
+
+  // Fetch user data on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await axios.get(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+        );
+
+        if (res.data) {
+          setProfileData({
+            name: res.data.name || '',
+            email: res.data.email || '',
+            phone: res.data.phone || '',
+            address: res.data.address || '',
+            image: res.data.image || '', // Profile image
+          });
+
+          setTempData({
+            name: res.data.name || '',
+            email: res.data.email || '',
+            phone: res.data.phone || '',
+            address: res.data.address || '',
+          });
+        } else {
+          Alert.alert('Error', 'User data not found!');
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        Alert.alert('Error', 'Failed to fetch user data');
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // Open delete account modal
   const handleDeleteAccount = () => {
     setDeleteModal(true);
   };
 
+  // Open logout modal
   const handleLogout = () => {
-  setLogoutModal(true);
-};
+    setLogoutModal(true);
+  };
 
+  // Pick image from gallery for profile picture
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
 
-const pickImageFromGallery = async () => {
-  try {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
-
-    if (result.assets && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      setSelectedImage(uri);  // बस UI के लिए hold करो
+      if (result.assets && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        setSelectedImage(uri);  // Hold for UI preview
+      }
+    } catch (err) {
+      console.error("Image picker error:", err);
     }
-  } catch (err) {
-    console.error("Image picker error:", err);
-  }
-};
+  };
 
+  // Confirm account deletion and remove user from DB
   const confirmDeleteAccount = async () => {
     setIsDeleting(true);
 
@@ -78,7 +148,6 @@ const pickImageFromGallery = async () => {
         message: 'Account deleted successfully!',
       });
 
-     
       setTimeout(() => {
         AsyncStorage.removeItem('username');
         AsyncStorage.removeItem('address');
@@ -97,72 +166,14 @@ const pickImageFromGallery = async () => {
       });
     }
   };
-  const [messageModal, setMessageModal] = useState({
-    visible: false,
-    type: '',
-    message: '',
-  });
 
-  const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+91 98765 43210',
-    address: '123 Main Street, City, State 12345',
-  });
-
-  const [settings, setSettings] = useState({
-    notifications: true,
-    emailUpdates: false,
-    darkMode: false,
-    locationServices: true,
-    biometricAuth: true,
-  });
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempData, setTempData] = useState({ ...profileData });
-
-  useEffect(() => {
-   const fetchUserData = async () => {
-  try {
-    const res = await axios.get(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-    );
-
-    if (res.data) {
-      setProfileData({
-        name: res.data.name || '',
-        email: res.data.email || '',
-        phone: res.data.phone || '',
-        address: res.data.address || '',
-        image: res.data.image || '', // ✅ इथे image field add कर
-      });
-
-      setTempData({
-        name: res.data.name || '',
-        email: res.data.email || '',
-        phone: res.data.phone || '',
-        address: res.data.address || '',
-      });
-    } else {
-      Alert.alert('Error', 'User data not found!');
-    }
-  } catch (err) {
-    console.error('Error fetching user data:', err);
-    Alert.alert('Error', 'Failed to fetch user data');
-  }
-};
-
-    fetchUserData();
-  }, []);
-
-  
-
+  // Cancel editing profile
   const handleCancel = () => {
     setTempData({ ...profileData });
     setIsEditing(false);
   };
 
-  
+  // Change password logic
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordError('Please fill all fields');
@@ -180,13 +191,13 @@ const pickImageFromGallery = async () => {
     }
 
     try {
-      // 🔍 Step 1: Fetch user data from Realtime DB
+      // Step 1: Fetch user data from DB
       const res = await axios.get(
         `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
       );
 
       if (res.data && res.data.password === currentPassword) {
-        // ✅ Step 2: Update password in DB
+        // Step 2: Update password in DB
         await axios.patch(
           `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
           {
@@ -215,90 +226,88 @@ const pickImageFromGallery = async () => {
     }
   };
 
-const handleSave = async () => {
-  try {
-    const updatedData = { ...tempData };
+  // Save profile changes to DB
+  const handleSave = async () => {
+    try {
+      const updatedData = { ...tempData };
 
-    // अगर user ने image बदली है
-    if (selectedImage) {
-      updatedData.image = selectedImage;
+      // If user changed image, add to update
+      if (selectedImage) {
+        updatedData.image = selectedImage;
+      }
+
+      await axios.patch(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
+        updatedData
+      );
+
+      setProfileData(prev => ({
+        ...updatedData,
+        image: selectedImage || prev.image,  // Keep shown image
+      }));
+
+      setIsEditing(false);
+      setSelectedImage(null); // Reset after save
+
+      setMessageModal({
+        visible: true,
+        type: 'success',
+        message: 'Profile updated successfully!',
+      });
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setMessageModal({
+        visible: true,
+        type: 'error',
+        message: 'Failed to update profile.',
+      });
     }
+  };
 
-    await axios.patch(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-      updatedData
-    );
-
-    setProfileData(prev => ({
-      ...updatedData,
-      image: selectedImage || prev.image,  // जो दिख रही थी वही रखो
-    }));
-
-    setIsEditing(false);
-    setSelectedImage(null); // reset after save
-
-    setMessageModal({
-      visible: true,
-      type: 'success',
-      message: 'Profile updated successfully!',
-    });
-
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    setMessageModal({
-      visible: true,
-      type: 'error',
-      message: 'Failed to update profile.',
-    });
-  }
-};
-
-
-
+  // Render profile header with image and username
   const renderProfileHeader = () => (
-  <View style={styles.profileHeader}>
-    <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.profileGradient}>
-      
-      {/* Profile Image (Just Display) */}
-      <Image
-        source={
-          selectedImage
-            ? { uri: selectedImage }
-            : profileData.image
-            ? { uri: profileData.image }
-            : require('../img/profile.png')
-        }
-        style={{
-          width: 100,
-          height: 100,
-          borderRadius: 50,
-          borderWidth: 2,
-          borderColor: '#fff',
-          alignSelf: 'center',
-          marginBottom: 10,
-        }}
-      />
-
-      {/* "Change Profile Image" Text - Clickable */}
-      {isEditing && (
-        <TouchableOpacity onPress={pickImageFromGallery}>
-          <Text style={{
-            color: '#fff',
-            textDecorationLine: 'underline',
-            fontSize: 14,
+    <View style={styles.profileHeader}>
+      <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.profileGradient}>
+        {/* Profile Image */}
+        <Image
+          source={
+            selectedImage
+              ? { uri: selectedImage }
+              : profileData.image
+                ? { uri: profileData.image }
+                : require('../img/profile.png')
+          }
+          style={{
+            width: 100,
+            height: 100,
+            borderRadius: 50,
+            borderWidth: 2,
+            borderColor: '#fff',
+            alignSelf: 'center',
             marginBottom: 10,
-          }}>
-            Change Profile Image
-          </Text>
-        </TouchableOpacity>
-      )}
+          }}
+        />
+        {/* Change Profile Image Button (only in edit mode) */}
+        {isEditing && (
+          <TouchableOpacity onPress={pickImageFromGallery}>
+            <Text style={{
+              color: '#fff',
+              textDecorationLine: 'underline',
+              fontSize: 14,
+              marginBottom: 10,
+            }}>
+              Change Profile Image
+            </Text>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.profileName}>{username}</Text>
+        <Text style={styles.profileEmail}>{profileData.email}</Text>
+      </LinearGradient>
+    </View>
+  );
 
-      <Text style={styles.profileName}>{username}</Text>
-      <Text style={styles.profileEmail}>{profileData.email}</Text>
-    </LinearGradient>
-  </View>
-);
-
+  // Render personal info section (edit/view)
   const renderPersonalInfo = () => (
     <View>
       <View style={styles.sectionHeader}>
@@ -314,7 +323,7 @@ const handleSave = async () => {
         </TouchableOpacity>
       </View>
       <View style={[styles.section, styles.infoCard]}>
-
+        {/* Username (not editable) */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Username</Text>
           <View style={styles.inputWrapper}>
@@ -326,7 +335,7 @@ const handleSave = async () => {
             />
           </View>
         </View>
-
+        {/* Email */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Email Address</Text>
           <View style={styles.inputWrapper}>
@@ -341,7 +350,7 @@ const handleSave = async () => {
             />
           </View>
         </View>
-
+        {/* Address */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Address</Text>
           <View style={styles.inputWrapper}>
@@ -353,11 +362,11 @@ const handleSave = async () => {
               editable={isEditing}
               placeholder="Enter your address"
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
             />
           </View>
         </View>
-
+        {/* Save/Cancel buttons in edit mode */}
         {isEditing && (
           <View style={styles.editActions}>
             <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
@@ -376,18 +385,20 @@ const handleSave = async () => {
       </View>
     </View>
   );
+
+  // Placeholder for settings section (not implemented)
   const renderSettingsSection = () => (
     <View style={styles.section}>
-
+      {/* Add settings toggles here if needed */}
     </View>
   );
 
+  // Render account actions (change password, help, about)
   const renderAccountActions = () => (
     <View>
       <Text style={styles.sectionTitle}>Account</Text>
-
       <View style={[styles.section, styles.actionsCard]}>
-
+        {/* Change Password */}
         <TouchableOpacity style={styles.actionItem} onPress={() => setPasswordModal(true)}>
           <View style={styles.actionInfo}>
             <Icon name="lock-closed-outline" size={24} color="#6366f1" />
@@ -395,7 +406,7 @@ const handleSave = async () => {
           </View>
           <Icon name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
-
+        {/* Help & Support */}
         <TouchableOpacity style={styles.actionItem}>
           <View style={styles.actionInfo}>
             <Icon name="help-circle-outline" size={24} color="#6366f1" />
@@ -403,7 +414,7 @@ const handleSave = async () => {
           </View>
           <Icon name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
-
+        {/* About App */}
         <TouchableOpacity style={styles.actionItem}>
           <View style={styles.actionInfo}>
             <Icon name="information-circle-outline" size={24} color="#6366f1" />
@@ -414,12 +425,13 @@ const handleSave = async () => {
       </View>
     </View>
   );
+
+  // Render danger zone (logout, delete account)
   const renderDangerZone = () => (
     <View>
       <Text style={styles.sectionTitle}>Danger Zone</Text>
-
       <View style={[styles.section, styles.dangerCard]}>
-
+        {/* Logout */}
         <TouchableOpacity style={styles.dangerItem} onPress={handleLogout}>
           <View style={styles.dangerInfo}>
             <Icon name="log-out-outline" size={24} color="#dc2626" />
@@ -427,7 +439,7 @@ const handleSave = async () => {
           </View>
           <Icon name="chevron-forward" size={20} color="#dc2626" />
         </TouchableOpacity>
-
+        {/* Delete Account */}
         <TouchableOpacity style={styles.dangerItem} onPress={handleDeleteAccount}>
           <View style={styles.dangerInfo}>
             <Icon name="trash-outline" size={24} color="#dc2626" />
@@ -439,10 +451,12 @@ const handleSave = async () => {
     </View>
   );
 
+  // Main render
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
 
+      {/* Header with back button and title */}
       <LinearGradient
         colors={['#1e293b', '#334155']}
         style={styles.header}
@@ -457,6 +471,7 @@ const handleSave = async () => {
         <View style={styles.headerRight} />
       </LinearGradient>
 
+      {/* Main scrollable content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {renderProfileHeader()}
         {renderPersonalInfo()}
@@ -464,6 +479,8 @@ const handleSave = async () => {
         {renderAccountActions()}
         {renderDangerZone()}
       </ScrollView>
+
+      {/* Message modal for success/error */}
       {messageModal.visible && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -481,7 +498,7 @@ const handleSave = async () => {
         </View>
       )}
 
-
+      {/* Delete account confirmation modal */}
       {deleteModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -489,7 +506,6 @@ const handleSave = async () => {
             <Text style={styles.modalMessage}>
               This action cannot be undone. Are you sure you want to delete your account?
             </Text>
-
             <View style={{ flexDirection: 'row', marginTop: 20 }}>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: '#e5e7eb', marginRight: 10 }]}
@@ -498,7 +514,6 @@ const handleSave = async () => {
               >
                 <Text style={{ color: '#1e293b' }}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.modalBtn, {
                   backgroundColor: '#dc2626',
@@ -521,11 +536,13 @@ const handleSave = async () => {
         </View>
       )}
 
+      {/* Change password modal */}
       {passwordModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Change Password</Text>
 
+            {/* Current password input */}
             <View style={{ position: 'relative', width: '100%' }}>
               <TextInput
                 style={styles.passwordInput}
@@ -547,6 +564,7 @@ const handleSave = async () => {
               </TouchableOpacity>
             </View>
 
+            {/* New password input */}
             <View style={{ position: 'relative', width: '100%' }}>
               <TextInput
                 style={styles.passwordInput}
@@ -568,7 +586,7 @@ const handleSave = async () => {
               </TouchableOpacity>
             </View>
 
-
+            {/* Confirm new password input */}
             <View style={{ position: 'relative', width: '100%' }}>
               <TextInput
                 style={styles.passwordInput}
@@ -590,15 +608,14 @@ const handleSave = async () => {
               </TouchableOpacity>
             </View>
 
-
-
-           
+            {/* Password error message */}
             {passwordError ? (
               <Text style={{ color: '#dc2626', fontSize: 14, marginTop: 10 }}>
                 {passwordError}
               </Text>
             ) : null}
 
+            {/* Modal actions */}
             <View style={{ flexDirection: 'row', marginTop: 20 }}>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: '#e5e7eb', marginRight: 10 }]}
@@ -610,7 +627,6 @@ const handleSave = async () => {
               >
                 <Text style={{ color: '#1e293b' }}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.modalBtn, {
                   backgroundColor: '#6366f1',
@@ -665,60 +681,72 @@ const handleSave = async () => {
           </View>
         </View>
       )}
-      
+
+      {/* Password error message (outside modal) */}
       {passwordError ? (
         <Text style={{ color: '#dc2626', fontSize: 14, marginTop: 10 }}>
           {passwordError}
         </Text>
       ) : null}
 
-
-
-
-{logoutModal && (
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalBox}>
-      <Text style={styles.modalTitle}>Logout</Text>
-      <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
-
-      <View style={{ flexDirection: 'row', marginTop: 20 }}>
-        <TouchableOpacity
-          style={[styles.modalBtn, { backgroundColor: '#e5e7eb', marginRight: 10 }]}
-          onPress={() => setLogoutModal(false)}
-        >
-          <Text style={{ color: '#1e293b' }}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modalBtn, {
-            backgroundColor: '#dc2626',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: 20
-          }]}
-          onPress={async () => {
-            try {
-              await AsyncStorage.removeItem('username');
-              await AsyncStorage.removeItem('address');
-              setLogoutModal(false);
-              navigation.replace('Welcome');
-            } catch (err) {
-              console.error('Logout error:', err);
-              setLogoutModal(false);
-            }
-          }}
-        >
-          <Text style={{ color: '#fff' }}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-)}
-
+      {/* Logout confirmation modal */}
+      {logoutModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Logout</Text>
+            <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
+            <View style={{ flexDirection: 'row', marginTop: 20 }}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#e5e7eb', marginRight: 10 }]}
+                onPress={() => {
+                  if (!isLoggingOut) setLogoutModal(false);
+                }}
+                disabled={isLoggingOut}
+              >
+                <Text style={{ color: '#1e293b' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, {
+                  backgroundColor: '#dc2626',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 20
+                }]}
+                onPress={async () => {
+                  try {
+                    setIsLoggingOut(true); // Start loader
+                    // Show loader for 1.5s before navigating
+                    setTimeout(async () => {
+                      await AsyncStorage.removeItem('username');
+                      await AsyncStorage.removeItem('address');
+                      setLogoutModal(false);
+                      setIsLoggingOut(false);
+                      navigation.replace('Welcome');
+                    }, 1500);
+                  } catch (err) {
+                    console.error('Logout error:', err);
+                    setIsLoggingOut(false);
+                    setLogoutModal(false);
+                  }
+                }}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff' }}>Logout</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   container: {
