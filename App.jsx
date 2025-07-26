@@ -30,11 +30,25 @@ import MainTabNavigator from './src/Navigators/MainTabNavigator';
 
 const Stack = createNativeStackNavigator();
 
+/**
+ * App
+ * Main entry point for the application.
+ * Handles:
+ * - User authentication check (auto-login using AsyncStorage)
+ * - Firebase Cloud Messaging (push notifications)
+ * - Navigation setup for all screens
+ */
 const App = () => {
+  // State for initial route (Welcome, Login, or MainTabs)
   const [initialRoute, setInitialRoute] = useState(null);
+  // State for logged-in username
   const [username, setUsername] = useState(null);
 
-  // 🔐 Check login from AsyncStorage
+  /**
+   * On mount: Check if user is logged in using AsyncStorage.
+   * - If valid, set initial route to MainTabs.
+   * - If not, set to Welcome or Login.
+   */
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -64,8 +78,15 @@ const App = () => {
     checkUser();
   }, []);
 
-  // ✅ Firebase Notification Setup
+  /**
+   * Firebase Notification Setup
+   * - Requests notification permission (Android 13+)
+   * - Gets FCM token
+   * - Sets up listeners for foreground/background notifications
+   * - Stores notifications in Firebase DB
+   */
   useEffect(() => {
+    // Request notification permission (Android 13+)
     const requestUserPermission = async () => {
       if (Platform.OS === 'android' && Platform.Version >= 33) {
         const granted = await PermissionsAndroid.request(
@@ -77,54 +98,59 @@ const App = () => {
       return true;
     };
 
+    // Get FCM token for push notifications
     const getFcmToken = async () => {
       const token = await messaging().getToken();
       console.log('🔥 FCM Token:', token);
     };
 
-
+    // Store notification in Firebase DB for the user
     const storeNotificationToDatabase = async (username, notification) => {
-  try {
-    await axios.post(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`,
-      {
-        title: notification.notification.title,
-        message: notification.notification.body,
-        icon: 'notifications-outline', // तुमच्या notification icon साठी
-        color: '#0984e3', // तुम्ही वेगवेगळे colors वापरू शकता
-        time: new Date().toISOString(),
-        isRead: false,
+      try {
+        await axios.post(
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`,
+          {
+            title: notification.notification.title,
+            message: notification.notification.body,
+            icon: 'notifications-outline', // Notification icon
+            color: '#0984e3', // Notification color
+            time: new Date().toISOString(),
+            isRead: false,
+          }
+        );
+        console.log('✅ Notification stored in database');
+      } catch (err) {
+        console.log('❌ Failed to store notification:', err.message);
       }
-    );
-    console.log('✅ Notification stored in database');
-  } catch (err) {
-    console.log('❌ Failed to store notification:', err.message);
-  }
-};
+    };
 
-  const setupNotificationListeners = () => {
-  messaging().onMessage(async remoteMessage => {
-    console.log('📩 Foreground Notification:', remoteMessage);
-    
-    // ✅ Show Alert
-    Alert.alert(remoteMessage.notification.title, remoteMessage.notification.body);
+    // Setup notification listeners for foreground/background
+    const setupNotificationListeners = () => {
+      // Foreground notification handler
+      messaging().onMessage(async remoteMessage => {
+        console.log('📩 Foreground Notification:', remoteMessage);
 
-    // ✅ Store in Firebase
-    if (username) {
-      storeNotificationToDatabase(username, remoteMessage);
-    }
-  });
+        // Show alert
+        Alert.alert(remoteMessage.notification.title, remoteMessage.notification.body);
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('📩 Background Notification:', remoteMessage);
-    
-    // ✅ Store in Firebase when app is in background
-    if (username) {
-      storeNotificationToDatabase(username, remoteMessage);
-    }
-  });
-};
+        // Store notification in Firebase
+        if (username) {
+          storeNotificationToDatabase(username, remoteMessage);
+        }
+      });
 
+      // Background notification handler
+      messaging().setBackgroundMessageHandler(async remoteMessage => {
+        console.log('📩 Background Notification:', remoteMessage);
+
+        // Store notification in Firebase
+        if (username) {
+          storeNotificationToDatabase(username, remoteMessage);
+        }
+      });
+    };
+
+    // Initialize FCM setup
     const setupFCM = async () => {
       await requestUserPermission();
       await getFcmToken();
@@ -134,14 +160,16 @@ const App = () => {
     setupFCM();
   }, []);
 
+  // Show loading screen while determining initial route
   if (!initialRoute) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-       
+        {/* Optionally add a loader here */}
       </View>
     );
   }
 
+  // Main navigation container and stack setup
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>

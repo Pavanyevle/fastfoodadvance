@@ -23,11 +23,31 @@ import axios from 'axios';
  * Shows an illustration and message when the cart is empty.
  */
 const EmptyCartIllustration = () => (
-  <View style={{ alignItems: 'center', marginTop: 40 }}>
-    <Text style={{ fontSize: 60 }}>🛒</Text>
-    <Text style={{ fontSize: 18, color: '#667eea', marginTop: 10 }}>Your cart is empty!</Text>
+  <View style={{
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  }}>
+    <Text style={{
+      fontSize: 18,
+      color: '#667eea',
+      marginTop: 10,
+      textAlign: 'center',
+    }}>
+      Your cart is empty!
+    </Text>
+
+    {/* Optional: Go to Home Button
+    <TouchableOpacity
+      style={{ marginTop: 20 }}
+      onPress={() => console.log("Go to Home tapped")}
+    >
+      <Text style={{ color: '#667eea', fontSize: 16 }}>Order Now</Text>
+    </TouchableOpacity> */}
   </View>
 );
+
 
 /**
  * OrderScreen

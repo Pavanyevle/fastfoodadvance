@@ -217,10 +217,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <Text style={styles.userName}>{name}</Text>
           <Text style={styles.userEmail}>{dbEmail}</Text>
 
-          <TouchableOpacity style={styles.viewActivityBtn}>
-            <Text style={styles.viewActivityText}>View Activity</Text>
-            <Ionicons name="arrow-forward" size={16} color="#4F46E5" />
-          </TouchableOpacity>
+       
         </View>
 
         {/* Menu options */}

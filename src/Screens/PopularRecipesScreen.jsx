@@ -190,14 +190,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
   const renderRecipeItem = ({ item }) => (
     <TouchableOpacity
       style={styles.recipeCard}
-      onPress={() =>
-        navigation.navigate('ItemCard', {
-          id: item.id,
-          username: username,
-          address: address,
-          quantities: quantities,
-        })
-      }
+      
     >
       {/* Food image and veg/non-veg dot */}
       <View style={styles.imageContainer}>
@@ -293,6 +286,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
       {/* Header with back button and title */}
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
         <View style={styles.headerRow}>
+          
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
@@ -595,11 +589,13 @@ loaderText: {
     alignItems: 'center',
     paddingHorizontal: 12,
     borderRadius: 20,
+    height:35,
+    width:80,
     paddingVertical: 6,
   },
   addButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
     marginLeft: 5,
   },

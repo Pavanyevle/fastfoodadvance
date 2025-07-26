@@ -151,7 +151,7 @@ const FoodDetailScreen = ({ navigation, route }) => {
 
           {/* Nutrition info */}
           <View style={styles.nutritionContainer}>
-            {['Fatsc', 'Carbs', 'Protein'].map((label, idx) => (
+            {['Fats', 'Carbs', 'Protein'].map((label, idx) => (
               <View key={idx} style={styles.nutrientBox}>
                 <Text style={styles.nutrientLabel}>{label}</Text>
                 <Text style={styles.nutrientValue}>{food[label.toLowerCase()]}g</Text>
