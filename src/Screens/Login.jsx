@@ -54,54 +54,85 @@ const Login = ({ navigation }) => {
    * - Stores credentials in AsyncStorage
    * - Navigates to MainTabs on success
    */
-  const handleSignUp = async () => {
-    setErrorMsg('');
 
-    if (!username || !email || !password || !confirmPassword)
-      return showError('Please fill all fields');
-    if (password !== confirmPassword)
-      return showError('Passwords do not match');
-    if (password.length < 6)
-      return showError('Password must be at least 6 characters');
+  const generateReferralCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = 'FAST';
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
 
-    setLoadingSignup(true);
+ const handleSignUp = async () => {
+  setErrorMsg('');
 
-    try {
-      // Check if username already exists
-      const userExists = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`);
+  // 🔐 Username validation
+  if (!username.trim()) return showError('Username is required');
+  if (username.length < 3) return showError('Username must be at least 3 characters');
+  if (/\s/.test(username)) return showError('Username should not contain spaces');
+  if (/[^a-zA-Z0-9]/.test(username)) return showError('Username should not contain special characters');
 
-      if (userExists.data) {
-        showError('Username already exists');
-        setLoadingSignup(false);
-        return;
-      }
+  // 🔐 Email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email.trim()) return showError('Email is required');
+  if (!emailRegex.test(email)) return showError('Invalid email format');
 
-      // Create new user in Firebase
-      await axios.put(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-        {
-          email: email.trim(),
-          password,
-          address: '.....', // Default address
-        }
-      );
-      // Store credentials locally
-      await AsyncStorage.setItem('username', username);
-      await AsyncStorage.setItem('password', password);
+  // 🔐 Password validation
+  if (!password.trim()) return showError('Password is required');
+  if (password.length < 6) return showError('Password must be at least 6 characters');
+  if (!/[A-Z]/.test(password)) return showError('Password must contain at least one uppercase letter');
+  if (!/[a-z]/.test(password)) return showError('Password must contain at least one lowercase letter');
+  if (!/[0-9]/.test(password)) return showError('Password must contain at least one number');
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return showError('Password must contain at least one special character');
 
-      // Navigate to main app
-      navigation.navigate('MainTabs', { username: username });
-    } catch (error) {
-      showError('Signup failed. Try again.');
-      console.log(error);
-    } finally {
+  // 🔐 Confirm password validation
+  if (!confirmPassword.trim()) return showError('Please confirm your password');
+  if (password !== confirmPassword) return showError('Passwords do not match');
+
+  // 🔄 Continue sign-up process
+  setLoadingSignup(true);
+
+  try {
+    const userExists = await axios.get(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+    );
+
+    if (userExists.data) {
+      showError('Username already exists');
       setLoadingSignup(false);
-      setUsername('');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
+      return;
     }
-  };
+
+    const referralCode = generateReferralCode();
+
+    await axios.put(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
+      {
+        email: email.trim(),
+        password,
+        address: '.....',
+        referralCode: referralCode,
+      }
+    );
+
+    await AsyncStorage.setItem('username', username);
+    await AsyncStorage.setItem('password', password);
+
+    navigation.replace('MainTabs', { username: username });
+
+  } catch (error) {
+    showError('Signup failed. Try again.');
+    console.log(error);
+  } finally {
+    setLoadingSignup(false);
+    setUsername('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+  }
+};
+
 
   /**
    * Handle user login
@@ -134,7 +165,7 @@ const Login = ({ navigation }) => {
         await AsyncStorage.setItem('password', password);
 
         // Navigate to main app
-        navigation.navigate('MainTabs', { username: username });
+        navigation.replace('MainTabs', { username: username });
       }
 
     } catch (error) {

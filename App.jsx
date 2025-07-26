@@ -26,6 +26,8 @@ import MainTabs from './src/Navigators/MainTabNavigator';
 import OrderStatusScreen from './src/Screens/OrderStatusScreen';
 import Home from './src/Screens/Home';
 import ChatBot from './src/Screens/ChatBot';
+import AboutScreen from './src/Screens/AboutScreen';
+import ReferScreen from './src/Screens/ReferScreen';
 import MainTabNavigator from './src/Navigators/MainTabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -196,6 +198,8 @@ const App = () => {
         <Stack.Screen name="Profile" component={Profile} />
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="ChatBot" component={ChatBot} />
+        <Stack.Screen name="AboutScreen" component={AboutScreen} />
+        <Stack.Screen name="ReferScreen" component={ReferScreen} />
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>

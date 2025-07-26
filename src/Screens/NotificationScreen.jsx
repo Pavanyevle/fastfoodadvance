@@ -138,7 +138,9 @@ const NotificationScreen = ({ navigation, route }) => {
 
       {/* Custom Header with back button and title */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    borderRadius: 25,}}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerText}>

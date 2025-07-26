@@ -64,7 +64,7 @@ const ProfileScreen = ({ navigation, route }) => {
       );
       if (res.data) {
         setDbEmail(res.data.email || 'No email');
-        setImageUrl(res.data.image || ''); 
+        setImageUrl(res.data.image || '');
         setProfileData(res.data);
       } else {
         setDbEmail('No email found');
@@ -113,9 +113,9 @@ const ProfileScreen = ({ navigation, route }) => {
       interval = setInterval(fetchNotificationCount, 1000);
     }
     return () => {
-      clearInterval(interval); 
+      clearInterval(interval);
     };
-  }, [isFocused]); 
+  }, [isFocused]);
 
   /**
    * Handle user sign out
@@ -171,6 +171,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
+         
           <TouchableOpacity
             style={styles.notificationBtn}
             onPress={() =>
@@ -217,7 +218,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <Text style={styles.userName}>{name}</Text>
           <Text style={styles.userEmail}>{dbEmail}</Text>
 
-       
+
         </View>
 
         {/* Menu options */}
@@ -226,6 +227,19 @@ const ProfileScreen = ({ navigation, route }) => {
           />
           <ProfileItem icon="history" text="My Orders" bg="#14B8A6" onPress={() => navigation.navigate('OrderHistoryScreen', { username: name })} />
           <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('ChatBot', { username: name })} />
+          <ProfileItem
+            icon="info-circle"
+            text="About"
+            bg="#3B82F6"
+            onPress={() => navigation.navigate('AboutScreen', { username: name })}
+          />
+          <ProfileItem
+            icon="gift"
+            text="Refer & Earn ₹100"
+            bg="#22C55E"
+            onPress={() => navigation.navigate('ReferScreen', { username: name })}
+          />
+
         </View>
 
         {/* Sign out button */}
@@ -428,7 +442,7 @@ const styles = StyleSheet.create({
   signOutContainer: {
     marginHorizontal: 20,
     marginTop: 30,
-    marginBottom: 40,
+    marginBottom: 56,
   },
   signOutGradient: {
     flexDirection: 'row',
