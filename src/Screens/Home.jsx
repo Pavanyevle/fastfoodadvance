@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRef } from 'react'; 
+import { useRef } from 'react';
 import {
   View,
   Text,
@@ -52,11 +52,48 @@ const Home = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null); // Selected profile image
   const [profileData, setProfileData] = useState({}); // Full profile data
   const isFocused = useIsFocused(); // Navigation focus state
-  
+
   // Ref for geolocation watch
-  const watchIdRef = useRef(null); 
+  const watchIdRef = useRef(null);
 
   const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
+
+
+  const [promos, setPromos] = useState([]);
+
+  const fetchPromos = async () => {
+    try {
+      const res = await axios.get(`${FIREBASE_DB_URL}/promos.json`);
+      const data = res.data;
+
+      if (data) {
+        const promoArray = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key]
+        }));
+        setPromos(promoArray);
+      }
+    } catch (err) {
+      console.log('❌ Error fetching promos:', err.message);
+    }
+  };
+
+
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning !');
+    else if (hour < 18) setGreeting('Good Afternoon !');
+    else setGreeting('Good Evening !');
+
+    if (isFocused) {
+      loadUserData();
+      fetchFoods();
+      fetchLatestOffers();
+      fetchNotificationCount();
+      fetchPromos(); // <-- Add this line
+    }
+  }, [isFocused]);
 
   // Fetch unread notification count from DB
   const fetchNotificationCount = async () => {
@@ -222,59 +259,6 @@ const Home = ({ navigation, route }) => {
     { id: '6', name: 'Drinks', image: require('../img/burger.jpeg'), icon: 'cup-water' },
   ];
 
-  // Static promo slides for Swiper
-  const promoSlides = [
-    {
-      title1: 'Get 50% OFF',
-      title2: 'on First Order!',
-      subtitle: 'No delivery fee on ₹149+',
-      image: require('../img/burger1.png'),
-      bgColor: ['#FF5722', '#FF7043'],
-    },
-    {
-      title1: 'Fast Biryani?',
-      title2: 'Delivered Hot',
-      subtitle: 'Under 30 minutes!',
-      bgColor: ['#4CAF50', '#66BB6A'],
-    },
-    {
-      title1: 'Snacks Hour!',
-      title2: 'Up to 30% OFF',
-      subtitle: 'Evening 4 PM to 6 PM',
-      bgColor: ['#FF9800', '#FFB74D'],
-    },
-    {
-      title1: 'Zero Delivery Fee',
-      title2: 'on Popular Restaurants',
-      subtitle: 'Limited Time Only',
-      image: require('../img/delivery_free.png'),
-      bgColor: ['#3F51B5', '#5C6BC0'],
-    },
-    {
-      title1: 'Weekend Special',
-      title2: 'Family Feast Packs',
-      subtitle: 'Combo + Drinks + Dessert',
-      bgColor: ['#9C27B0', '#BA68C8'],
-    },
-    {
-      title1: 'Midnight Cravings?',
-      title2: 'We Deliver Till 2 AM!',
-      subtitle: 'Late Night Meals Available',
-      bgColor: ['#263238', '#37474F'],
-    },
-    {
-      title1: 'Healthy Bowls',
-      title2: 'For Fitness Freaks',
-      subtitle: 'Low-cal & high protein',
-      bgColor: ['#00C853', '#4CAF50'],
-    },
-    {
-      title1: 'Refer & Earn ₹100',
-      title2: 'Share App with Friends!',
-      subtitle: 'They order, you earn',
-      bgColor: ['#00BCD4', '#26C6DA'],
-    },
-  ];
 
   // Render a single food category item
   const renderFoodItem = ({ item }) => (
@@ -513,13 +497,13 @@ const Home = ({ navigation, route }) => {
             <View style={styles.sliderContainer}>
               <Swiper
                 autoplay
-                autoplayTimeout={4}
+                autoplayTimeout={2}
                 showsPagination={true}
                 dotColor="rgba(255,255,255,0.5)"
                 activeDotColor="#fff"
                 paginationStyle={styles.pagination}
               >
-                {promoSlides.map((item, index) => (
+                {promos.map((item, index) => (
                   <View key={index} style={styles.slideContainer}>
                     <LinearGradient colors={item.bgColor} style={styles.promoCard}>
                       <View style={styles.promoContent}>
@@ -528,14 +512,13 @@ const Home = ({ navigation, route }) => {
                           <Text style={styles.promoSubtitle}>{item.title2}</Text>
                           <Text style={styles.promoDesc}>{item.subtitle}</Text>
                         </View>
-                        {item.image && (
-                          <Image source={item.image} style={styles.promoImage} />
-                        )}
+                        
                       </View>
                     </LinearGradient>
                   </View>
                 ))}
               </Swiper>
+
             </View>
 
             {/* Food Categories Horizontal List */}

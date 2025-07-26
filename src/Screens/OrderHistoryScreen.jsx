@@ -45,12 +45,12 @@ const OrderHistoryScreen = ({ navigation, route }) => {
    * Get color for order status badge
    */
   const getStatusColor = (s) =>
-    ({
-      delivered: '#059669',
-      pending: '#ea580c',
-      processing: '#3b82f6',
-      cancelled: '#dc2626',
-    }[s] || '#64748b');
+  ({
+    delivered: '#059669',
+    pending: '#ea580c',
+    processing: '#3b82f6',
+    cancelled: '#dc2626',
+  }[s] || '#64748b');
 
   /**
    * Cancel an order by updating its status in Firebase
@@ -93,7 +93,7 @@ const OrderHistoryScreen = ({ navigation, route }) => {
             id,
             ...o,
           }));
-          setOrders(arr.sort((a, b) => b.orderTime - a.orderTime));
+          setOrders(arr.sort((a, b) => new Date(b.orderTime) - new Date(a.orderTime)));
         } else {
           setOrders([]);
         }
@@ -143,15 +143,15 @@ const OrderHistoryScreen = ({ navigation, route }) => {
                 item.status === 'delivered'
                   ? 'checkmark-circle'
                   : item.status === 'pending'
-                  ? 'time'
-                  : item.status === 'cancelled'
-                  ? 'close-circle'
-                  : 'time'
+                    ? 'time'
+                    : item.status === 'cancelled'
+                      ? 'close-circle'
+                      : 'time'
               }
               size={16}
               color={getStatusColor(item.status)}
             />
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}> 
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
               {item.status}
             </Text>
           </View>
@@ -198,6 +198,12 @@ const OrderHistoryScreen = ({ navigation, route }) => {
         data={orders}
         keyExtractor={(i) => i.id}
         renderItem={renderOrder}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+
+            <Text style={styles.emptyText}>You have no orders yet.</Text>
+          </View>
+        )}
       />
 
       {/* Confirm Cancel Modal */}
@@ -463,6 +469,24 @@ const styles = StyleSheet.create({
     color: '#334155',
     textAlign: 'center',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 200,
+  },
+  emptyImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
+    resizeMode: 'contain',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+
 });
 
 export default OrderHistoryScreen;

@@ -273,11 +273,15 @@ const PopularRecipesScreen = ({ navigation, route }) => {
   );
 
   // Filter recipes by category if title is provided
-  const filteredRecipes = title
-    ? popularRecipes.filter(item =>
-        item.category?.toLowerCase() === title.toLowerCase()
-      )
-    : popularRecipes;
+const filteredRecipes = popularRecipes.filter(item => {
+  const categoryFromItem = item.category?.toLowerCase().replace(/\s+/g, '').trim() || '';
+  const titleParam = title?.toLowerCase().replace(/\s+/g, '').trim() || '';
+
+
+  if (!titleParam) return true;
+  return categoryFromItem === titleParam;
+});
+
 
   // Main UI render
   return (
@@ -291,7 +295,6 @@ const PopularRecipesScreen = ({ navigation, route }) => {
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Popular Recipes</Text>
-          <Ionicons name="search" size={24} color="#fff" />
         </View>
         <Text style={styles.headerSubtitle}>
           Most loved dishes by our customers
@@ -433,6 +436,7 @@ loaderText: {
 
   headerTitle: {
     fontSize: 20,
+    marginRight:100,
     fontWeight: 'bold',
     color: '#fff',
   },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, PermissionsAndroid, Platform, Alert } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, PermissionsAndroid, Platform, Alert, Text, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -164,7 +164,12 @@ const App = () => {
   if (!initialRoute) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        {/* Optionally add a loader here */}
+        <View>
+          <Image
+            source={require('./src/img/logo.png')}
+            style={styles.image}
+          />
+        </View>
       </View>
     );
   }
@@ -196,5 +201,18 @@ const App = () => {
     </NavigationContainer>
   );
 };
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  image: {
+    width: 150,
+    height: 150,
+    borderRadius:20,
+    resizeMode: 'cover',
+  },
+});
 
 export default App;
