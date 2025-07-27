@@ -161,86 +161,84 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-  // Location permission and address update logic
+
+
+
   useEffect(() => {
-    // Request location permission (Android)
     const requestLocationPermission = async () => {
       try {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: 'Location Permission',
-            message: 'This app needs access to your location.',
+            message: 'This app needs access to your location for deliveries.',
             buttonPositive: 'Allow',
-            buttonNegative: 'Deny',
           }
         );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn(err);
-        return false;
-      }
-    };
 
-    // Start watching user location and update address
-    const startWatchingLocation = async () => {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        console.log('❌ Location permission denied');
-        return;
-      }
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          console.log("✅ Permission granted");
 
-      watchIdRef.current = Geolocation.watchPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          console.log('📍 Location:', latitude, longitude);
+          // Start watching location
+          watchIdRef.current = Geolocation.watchPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              console.log('📍 Live Location:', latitude, longitude);
 
-          try {
-            // Reverse geocode to get address
-            const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-              params: {
-                lat: latitude,
-                lon: longitude,
-                format: 'json',
-              },
-              headers: {
-                'User-Agent': 'ReactNativeApp/1.0 (pavanyevle6@gmail.com)',
-                'Accept-Language': 'en',
-              },
-            });
+              try {
+                // Reverse geocode using Nominatim
+                const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+                  params: {
+                    lat: latitude,
+                    lon: longitude,
+                    format: 'json',
+                  },
+                  headers: {
+                    'User-Agent': 'ReactNativeApp/1.0 (pavanyevle6@gmail.com)',
+                    'Accept-Language': 'en',
+                  },
+                });
 
-            const currentAddress = response.data?.display_name || 'Unknown Address';
-            console.log('📦 Got Address:', currentAddress);
-            setAddress(currentAddress);
+                const resolvedAddress = response.data?.display_name || 'Unknown Address';
+                console.log('🏠 Address:', resolvedAddress);
+                setAddress(resolvedAddress);
 
-            // Update address in Firebase and AsyncStorage
-            const storedUsername = await AsyncStorage.getItem('username');
-            if (storedUsername) {
-              await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
-                address: currentAddress,
-              });
+                const storedUsername = await AsyncStorage.getItem('username');
+                if (storedUsername) {
+                  await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
+                    address: resolvedAddress,
+                    latitude: latitude,
+                    longitude: longitude
+                  });
+                }
+
+                await AsyncStorage.setItem('address', resolvedAddress);
+              } catch (error) {
+                console.log('❌ Reverse geocoding error:', error.message);
+              }
+            },
+            (error) => {
+              console.log('❌ Location error:', error.message);
+            },
+            {
+              enableHighAccuracy: true,
+              distanceFilter: 5,
+              interval: 10000,
+              fastestInterval: 5000,
+              forceRequestLocation: true,
+              showLocationDialog: true,
             }
-
-            await AsyncStorage.setItem('address', currentAddress);
-          } catch (error) {
-            console.log('❌ Error getting address:', error.message);
-          }
-        },
-        (error) => {
-          console.log('❌ watchPosition error:', error.message);
-        },
-        {
-          enableHighAccuracy: true,
-          distanceFilter: 10,
-          interval: 10000,
-          fastestInterval: 5000,
+          );
+        } else {
+          console.log('❌ Location permission denied');
         }
-      );
+      } catch (err) {
+        console.log('❌ Location permission error:', err);
+      }
     };
 
-    startWatchingLocation();
+    requestLocationPermission();
 
-    // Cleanup geolocation watch on unmount
     return () => {
       if (watchIdRef.current !== null) {
         Geolocation.clearWatch(watchIdRef.current);
@@ -248,6 +246,9 @@ const Home = ({ navigation, route }) => {
       }
     };
   }, []);
+
+
+
 
   // Static food categories for horizontal scroll
   const foodItems = [
@@ -512,7 +513,7 @@ const Home = ({ navigation, route }) => {
                           <Text style={styles.promoSubtitle}>{item.title2}</Text>
                           <Text style={styles.promoDesc}>{item.subtitle}</Text>
                         </View>
-                        
+
                       </View>
                     </LinearGradient>
                   </View>
@@ -581,10 +582,6 @@ const Home = ({ navigation, route }) => {
 };
 
 export default Home;
-
-
-
-
 
 const styles = StyleSheet.create({
   container: {
