@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-
+import Chat from './Chat'
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -140,26 +140,25 @@ const ProfileScreen = ({ navigation, route }) => {
   /**
    * Profile menu item component
    */
-  const ProfileItem = ({ icon, text, bg, onPress, badge }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <LinearGradient colors={[bg, bg + 'CC']} style={styles.menuItemGradient}>
-        <View style={styles.menuItemContent}>
-          <View style={styles.iconContainer}>
-            <FontAwesome name={icon} size={22} color="#fff" />
-          </View>
-          <View style={styles.menuItemTextContainer}>
-            <Text style={styles.menuItemText}>{text}</Text>
-            {badge && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{badge}</Text>
-              </View>
-            )}
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+  const ProfileItem = ({ icon, text, onPress, badge }) => (
+    <TouchableOpacity style={styles.simpleMenuItem} onPress={onPress}>
+      <View style={styles.simpleMenuItemContent}>
+        <View style={styles.simpleIconContainer}>
+          <FontAwesome name={icon} size={22} color="#4B5563" />
         </View>
-      </LinearGradient>
+        <View style={styles.simpleTextContainer}>
+          <Text style={styles.simpleText}>{text}</Text>
+          {badge && (
+            <View style={styles.simpleBadge}>
+              <Text style={styles.simpleBadgeText}>{badge}</Text>
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+      </View>
     </TouchableOpacity>
   );
+
 
   // Main UI render
   return (
@@ -171,7 +170,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-         
+
           <TouchableOpacity
             style={styles.notificationBtn}
             onPress={() =>
@@ -226,7 +225,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <ProfileItem icon="cog" text="Profile Settings" bg="#6366F1" onPress={() => navigation.navigate('ProfileSettingsScreen', { username: name })}
           />
           <ProfileItem icon="history" text="My Orders" bg="#14B8A6" onPress={() => navigation.navigate('OrderHistoryScreen', { username: name })} />
-          <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('ChatBot', { username: name })} />
+          <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('Chat', { username: name })} />
           <ProfileItem
             icon="info-circle"
             text="About"
@@ -235,7 +234,7 @@ const ProfileScreen = ({ navigation, route }) => {
           />
           <ProfileItem
             icon="gift"
-            text="Refer & Earn ₹100"
+            text="Refer & Get Free Order"
             bg="#22C55E"
             onPress={() => navigation.navigate('ReferScreen', { username: name })}
           />
@@ -283,6 +282,8 @@ const ProfileScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+              <Chat  />
+
     </View>
   );
 };
@@ -497,5 +498,55 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     alignItems: 'center',
   },
+  simpleMenuItem: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    elevation: 2,
+  },
+
+  simpleMenuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  simpleIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB', // Light gray circle
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+
+  simpleTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  simpleText: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '500',
+  },
+
+  simpleBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+
+  simpleBadgeText: {
+    color: '#374151',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
 });
 export default ProfileScreen;

@@ -7,6 +7,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Dimensions,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  ScrollView,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -201,6 +204,17 @@ const Login = ({ navigation }) => {
 
   // Main UI render
   return (
+
+
+   <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={{ flex: 1 }}
+  >
+    <TouchableWithoutFeedback >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, backgroundColor: '#ffffff', minHeight: height,  }}
+        keyboardShouldPersistTaps="handled"
+      >
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D2B" />
       {/* Header section with title and subtitle */}
@@ -295,6 +309,9 @@ const Login = ({ navigation }) => {
         </View>
       )}
     </View>
+       </ScrollView>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
   );
 };
 

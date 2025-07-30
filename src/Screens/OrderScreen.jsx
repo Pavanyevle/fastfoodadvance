@@ -17,6 +17,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Chat from './Chat'
 
 /**
  * EmptyCartIllustration
@@ -166,7 +167,7 @@ const OrderScreen = ({ navigation, route }) => {
             };
           });
           const foodDetails = await Promise.all(foodDetailsPromises);
-          setCartItems(foodDetails);
+          setCartItems(foodDetails.reverse()); // 🔁 latest item first
         } else {
           setCartItems([]);
         }
@@ -334,6 +335,7 @@ const OrderScreen = ({ navigation, route }) => {
           <Text style={styles.itemTotal}>{item.total}</Text>
         </View>
       </View>
+
     </View>
   );
 
@@ -379,162 +381,166 @@ const OrderScreen = ({ navigation, route }) => {
 
   // Main UI render
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#667eea" barStyle="light-content" />
-      {/* Header with back button and title */}
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>Your Order</Text>
-            <Text style={styles.headerSubtitle}>Review and place your order</Text>
-          </View>
-        </View>
-      </LinearGradient>
-
-      {/* Loader while fetching cart */}
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 }}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={{ marginTop: 10, fontSize: 16, color: '#667eea' }}>
-            Loading your cart...
-          </Text>
-        </View>
-      ) : cartItems.length === 0 ? (
-        <EmptyCartIllustration />
-      ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Cart Items Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Cart Items</Text>
-            <FlatList
-              data={cartItems}
-              renderItem={renderCartItem}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-              contentContainerStyle={styles.cartList}
-            />
-          </View>
-
-          {/* Delivery Address Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Delivery Address</Text>
-            {deliveryAddresses.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.deliveryAddress, deliveryAddress === item.name && styles.selectedAddress]}
-                onPress={() => setDeliveryAddress(item.name)}
-              >
-                <View style={styles.addressContent}>
-                  <View style={styles.addressHeader}>
-                    <Ionicons name="location" size={20} color="#667eea" />
-                    <Text style={styles.addressName}>{item.name}</Text>
-                  </View>
-                  <Text style={styles.addressText}>{item.address}</Text>
-                </View>
-                {deliveryAddress === item.name && (
-                  <Ionicons name="checkmark-circle" size={24} color="#667eea" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Order Summary Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Order Summary</Text>
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>₹{subtotal}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Delivery Fee</Text>
-                <Text style={styles.summaryValue}>₹{deliveryFee}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Tax (5%)</Text>
-                <Text style={styles.summaryValue}>₹{tax}</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.summaryRow}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>₹{total}</Text>
-              </View>
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar backgroundColor="#667eea" barStyle="light-content" />
+        {/* Header with back button and title */}
+        <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>Your Order</Text>
+              <Text style={styles.headerSubtitle}>Review and place your order</Text>
             </View>
           </View>
+        </LinearGradient>
 
-          {/* Delivery Info and Place Order Button Section */}
-          <View style={styles.section}>
-            <View style={styles.deliveryInfoCard}>
-              <View style={styles.deliveryInfoRow}>
-                <Ionicons name="time-outline" size={20} color="#667eea" />
-                <Text style={styles.deliveryInfoText}>Estimated Delivery: {deliveryTime}</Text>
-              </View>
-              <View style={styles.deliveryInfoRow}>
-                <Ionicons name="location-outline" size={20} color="#667eea" />
-                <Text style={styles.deliveryInfoText}>Delivery to: {deliveryAddress}</Text>
-              </View>
-            </View>
+        {/* Loader while fetching cart */}
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 }}>
+            <ActivityIndicator size="large" color="#667eea" />
+            <Text style={{ marginTop: 10, fontSize: 16, color: '#667eea' }}>
+              Loading your cart...
+            </Text>
+          </View>
+        ) : cartItems.length === 0 ? (
+          <EmptyCartIllustration />
+        ) : (
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Cart Items Section */}
             <View style={styles.section}>
-              <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder} activeOpacity={0.8}>
-                <LinearGradient colors={['#667eea', '#764ba2']} style={styles.placeOrderGradient}>
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                  <Text style={styles.placeOrderText}>Place Order - ₹{total}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>Cart Items</Text>
+              <FlatList
+                data={cartItems}
+                renderItem={renderCartItem}
+                keyExtractor={item => item.id}
+                scrollEnabled={false}
+                contentContainerStyle={styles.cartList}
+              />
             </View>
-          </View>
-        </ScrollView>
-      )}
 
-      {/* Bottom container for animation (currently empty) */}
-      <View style={styles.bottomContainer}>
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }} />
-      </View>
-
-      {/* Modal for confirming item deletion */}
-      <Modal visible={deleteModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Remove Item?</Text>
-            {deleting ? (
-              <ActivityIndicator size="large" color="#667eea" />
-            ) : (
-              <View style={styles.modalButtonRow}>
+            {/* Delivery Address Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Delivery Address</Text>
+              {deliveryAddresses.map(item => (
                 <TouchableOpacity
-                  style={styles.modalBtn}
-                  onPress={() => handleDeleteItem(itemToDelete)}
+                  key={item.id}
+                  style={[styles.deliveryAddress, deliveryAddress === item.name && styles.selectedAddress]}
+                  onPress={() => setDeliveryAddress(item.name)}
                 >
-                  <Text style={styles.modalBtnText}>Yes</Text>
+                  <View style={styles.addressContent}>
+                    <View style={styles.addressHeader}>
+                      <Ionicons name="location" size={20} color="#667eea" />
+                      <Text style={styles.addressName}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.addressText}>{item.address}</Text>
+                  </View>
+                  {deliveryAddress === item.name && (
+                    <Ionicons name="checkmark-circle" size={24} color="#667eea" />
+                  )}
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalBtn}
-                  onPress={() => setDeleteModalVisible(false)}
-                >
-                  <Text style={styles.modalBtnText}>No</Text>
+              ))}
+            </View>
+
+            {/* Order Summary Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Order Summary</Text>
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryValue}>₹{subtotal}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Delivery Fee</Text>
+                  <Text style={styles.summaryValue}>₹{deliveryFee}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Tax (5%)</Text>
+                  <Text style={styles.summaryValue}>₹{tax}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalValue}>₹{total}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Delivery Info and Place Order Button Section */}
+            <View style={styles.section}>
+              <View style={styles.deliveryInfoCard}>
+                <View style={styles.deliveryInfoRow}>
+                  <Ionicons name="time-outline" size={20} color="#667eea" />
+                  <Text style={styles.deliveryInfoText}>Estimated Delivery: {deliveryTime}</Text>
+                </View>
+                <View style={styles.deliveryInfoRow}>
+                  <Ionicons name="location-outline" size={20} color="#667eea" />
+                  <Text style={styles.deliveryInfoText}>Delivery to: {deliveryAddress}</Text>
+                </View>
+              </View>
+              <View style={styles.section}>
+                <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder} activeOpacity={0.8}>
+                  <LinearGradient colors={['#667eea', '#764ba2']} style={styles.placeOrderGradient}>
+                    <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                    <Text style={styles.placeOrderText}>Place Order - ₹{total}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+            </View>
+          </ScrollView>
+        )}
 
-      {/* Loader modal while placing order */}
-      {isPlacingOrder && (
-        <Modal transparent animationType="fade">
+        {/* Bottom container for animation (currently empty) */}
+        <View style={styles.bottomContainer}>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }} />
+        </View>
+
+        {/* Modal for confirming item deletion */}
+        <Modal visible={deleteModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <ActivityIndicator size="large" color="#667eea" />
-              <Text style={{ marginTop: 15, fontSize: 16, color: '#667eea' }}>
-                Placing your order...
-              </Text>
+              <Text style={styles.modalTitle}>Remove Item?</Text>
+              {deleting ? (
+                <ActivityIndicator size="large" color="#667eea" />
+              ) : (
+                <View style={styles.modalButtonRow}>
+                  <TouchableOpacity
+                    style={styles.modalBtn}
+                    onPress={() => handleDeleteItem(itemToDelete)}
+                  >
+                    <Text style={styles.modalBtnText}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalBtn}
+                    onPress={() => setDeleteModalVisible(false)}
+                  >
+                    <Text style={styles.modalBtnText}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
-      )}
-    </SafeAreaView>
+
+        {/* Loader modal while placing order */}
+        {isPlacingOrder && (
+          <Modal transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalBox}>
+                <ActivityIndicator size="large" color="#667eea" />
+                <Text style={{ marginTop: 15, fontSize: 16, color: '#667eea' }}>
+                  Placing your order...
+                </Text>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+      </SafeAreaView>
+      <Chat />
+    </View>
   );
 };
 

@@ -15,6 +15,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
+import Chat from './Chat'
 
 // Get device width for responsive design
 const { width } = Dimensions.get('window');
@@ -126,6 +127,7 @@ const FoodDetailScreen = ({ navigation, route }) => {
 
   // Main UI render
   return (
+    <View style={{flex:1}}>
     <SafeAreaView style={styles.screen}>
       <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
 
@@ -221,6 +223,8 @@ const FoodDetailScreen = ({ navigation, route }) => {
         </View>
       </Modal>
     </SafeAreaView>
+<Chat/>
+    </View>
   );
 };
 

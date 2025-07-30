@@ -16,24 +16,63 @@ const ForgotPassword = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleReset = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address.');
+ // NOTE: This version checks the email in Firebase Realtime Database before sending the reset link.
+// It does NOT use Firebase Authentication, but your own endpoint for sending the reset email.
+
+const handleReset = async () => {
+  if (!email) {
+    Alert.alert('Error', 'Please enter your email address.');
+    return;
+  }
+  setLoading(true);
+  try {
+    // 1. Check if email exists in your Firebase Realtime Database
+    const res = await fetch('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users.json');
+    const users = await res.json();
+
+    // Find user with matching email
+    let found = false;
+    let username = '';
+    if (users) {
+      for (const key in users) {
+        if (users[key].email && users[key].email.toLowerCase() === email.toLowerCase()) {
+          found = true;
+          username = key;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      Alert.alert('Error', 'Email not found. Please enter a registered email.');
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      await auth().sendPasswordResetEmail(email);
+
+    // 2. Call your custom endpoint to send the reset email
+    // Replace this URL with your actual endpoint
+    const endpoint = 'https://your-api-endpoint.com/send-reset-link';
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, username }),
+    });
+    const result = await resp.json();
+
+    if (resp.ok) {
       Alert.alert(
         'Success',
         'Password reset link sent! Please check your email.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Something went wrong.');
+    } else {
+      Alert.alert('Error', result.message || 'Failed to send reset link.');
     }
-    setLoading(false);
-  };
+  } catch (error) {
+    Alert.alert('Error', error.message || 'Something went wrong.');
+  }
+  setLoading(false);
+};
 
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>

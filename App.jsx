@@ -22,7 +22,7 @@ import OrderScreen from './src/Screens/OrderScreen';
 import PaymentScreen from './src/Screens/PaymentScreen';
 import OrderHistoryScreen from './src/Screens/OrderHistoryScreen';
 import FavoritesScreen from './src/Screens/FavoritesScreen';
-import MainTabs from './src/Navigators/MainTabNavigator';
+import Chat from './src/Screens/Chat';
 import OrderStatusScreen from './src/Screens/OrderStatusScreen';
 import Home from './src/Screens/Home';
 import ChatBot from './src/Screens/ChatBot';
@@ -201,6 +201,8 @@ const App = () => {
         <Stack.Screen name="AboutScreen" component={AboutScreen} />
         <Stack.Screen name="ReferScreen" component={ReferScreen} />
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+        <Stack.Screen name="Chat" component={Chat} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

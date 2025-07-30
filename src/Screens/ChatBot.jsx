@@ -15,6 +15,7 @@ import {
 import axios from 'axios';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // GROQ API key for AI assistant (replace with your own key in production)
 const GROQ_API_KEY = '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'; // Replace with your actual GROQ API key
@@ -28,7 +29,7 @@ const GROQ_API_KEY = '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';
  * - Sends user messages to AI API and displays responses
  * - Shows typing indicator and handles loading states
  */
-const ChatBot = ({ navigation, route }) => {
+const ChatBot = ({ navigation }) => {
   // State for chat messages
   const [messages, setMessages] = useState([]);
   // State for input text
@@ -40,7 +41,7 @@ const ChatBot = ({ navigation, route }) => {
   // Ref for FlatList to scroll to bottom
   const flatListRef = useRef(null);
   // Username from navigation params
-  const { username } = route.params;
+  const [username, setUsername] = useState('');
   // Loading state for chat history
   const [chatLoading, setChatLoading] = useState(true);
 
@@ -82,10 +83,31 @@ const ChatBot = ({ navigation, route }) => {
     }
   };
 
+
+  useEffect(() => {
+    const getUsernameFromStorage = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem('username');
+        if (storedUsername) {
+          setUsername(storedUsername);
+        } else {
+          Alert.alert("Error", "Username not found in storage.");
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error("Error retrieving username:", error);
+      }
+    };
+
+    getUsernameFromStorage();
+  }, []);
+
   /**
    * On mount: fetch chat history from Firebase
    */
   useEffect(() => {
+    if (!username) return; // username तयार नसताना history fetch करू नको
+
     const fetchChatHistory = async () => {
       try {
         const userKey = username.replace('.', '_');
@@ -99,13 +121,14 @@ const ChatBot = ({ navigation, route }) => {
           setMessages(messagesArray);
         }
       } catch (error) {
-        // Ignore errors for now
+        console.log("❌ Error fetching chat history:", error);
       } finally {
         setChatLoading(false);
       }
     };
+
     fetchChatHistory();
-  }, []);
+  }, [username]); // ✅ dependency मध्ये username ठेवलं आहे
 
   /**
    * Scroll to bottom when messages change
@@ -168,6 +191,13 @@ const ChatBot = ({ navigation, route }) => {
     setInput('');
     setLoading(true);
     setIsTyping(true);
+    // Add typing indicator message after user message
+    const typingMsg = {
+      id: 'typing-indicator',
+      sender: 'typing'
+    };
+    setMessages(prev => [...prev, typingMsg]);
+
 
     try {
       let aiText = '';
@@ -200,6 +230,7 @@ const ChatBot = ({ navigation, route }) => {
                 ${userOrderData}
 
                🍔 Available Food Menu:
+               you show only avilable food on my database
                ${liveFoodData}
 
                Your Role:
@@ -236,7 +267,11 @@ const ChatBot = ({ navigation, route }) => {
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => {
+        const updated = prev.filter(msg => msg.id !== 'typing-indicator');
+        return [...updated, aiMsg];
+      });
+
       saveMessageToFirebase(aiMsg);
     } catch (error) {
       Alert.alert('Error', 'AI API failed to respond');
@@ -256,44 +291,43 @@ const ChatBot = ({ navigation, route }) => {
   /**
    * Render a single chat message bubble
    */
-  const renderItem = ({ item }) => (
-    <View style={[styles.messageContainer, item.sender === 'me' ? styles.myMessage : styles.otherMessage]}>
-      {item.sender === 'other' && (
-        <View style={styles.botAvatar}>
-          <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
-        </View>
-      )}
-      <View style={[styles.messageBubble, item.sender === 'me' ? styles.myBubble : styles.otherBubble]}>
-        <Text style={[styles.messageText, item.sender === 'me' ? styles.myMessageText : styles.otherMessageText]}>
-          {item.text.trim()}
-        </Text>
-        <Text style={[styles.timestamp, item.sender === 'me' ? styles.myTimestamp : styles.otherTimestamp]}>
-          {formatTime(item.timestamp)}
-        </Text>
-      </View>
-    </View>
-  );
-
-  /**
-   * Render typing indicator when AI is "typing"
-   */
-  const renderTypingIndicator = () => {
-    if (!isTyping) return null;
-    return (
-      <View style={styles.typingContainer}>
-        <View style={styles.botAvatar}>
-          <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
-        </View>
-        <View style={styles.typingBubble}>
-          <View style={styles.typingDots}>
-            <View style={[styles.dot, styles.dot1]} />
-            <View style={[styles.dot, styles.dot2]} />
-            <View style={[styles.dot, styles.dot3]} />
+  const renderItem = ({ item }) => {
+    if (item.sender === 'typing') {
+      return (
+        <View style={styles.typingContainer}>
+          <View style={styles.botAvatar}>
+            <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
           </View>
+          <View style={styles.typingBubble}>
+            <View style={styles.typingDots}>
+              <View style={[styles.dot, styles.dot1]} />
+              <View style={[styles.dot, styles.dot2]} />
+              <View style={[styles.dot, styles.dot3]} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.messageContainer, item.sender === 'me' ? styles.myMessage : styles.otherMessage]}>
+        {item.sender === 'other' && (
+          <View style={styles.botAvatar}>
+            <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+          </View>
+        )}
+        <View style={[styles.messageBubble, item.sender === 'me' ? styles.myBubble : styles.otherBubble]}>
+          <Text style={[styles.messageText, item.sender === 'me' ? styles.myMessageText : styles.otherMessageText]}>
+            {item.text.trim()}
+          </Text>
+          <Text style={[styles.timestamp, item.sender === 'me' ? styles.myTimestamp : styles.otherTimestamp]}>
+            {formatTime(item.timestamp)}
+          </Text>
         </View>
       </View>
     );
   };
+
 
   // Main UI render
   return (
@@ -328,8 +362,16 @@ const ChatBot = ({ navigation, route }) => {
             keyExtractor={item => item.id}
             contentContainerStyle={styles.messagesContainer}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyChatContainer}>
+                <Ionicons name="chatbubble-ellipses-outline" size={60} color="#ccc" style={{ marginBottom: 10 }} />
+                <Text style={styles.emptyChatTitle}>No messages yet</Text>
+                <Text style={styles.emptyChatSubtitle}>Start the conversation by typing a message below!</Text>
+              </View>
+            }
           />
-          {renderTypingIndicator()}
+
+
         </View>
       )}
       {/* Input area for typing and sending messages */}
@@ -551,7 +593,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
+    paddingHorizontal: 2,
     paddingVertical: 15,
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
@@ -559,6 +601,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    paddingBottom: 10,
   },
   inputWrapper: {
     flex: 1,
@@ -571,6 +614,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
     marginRight: 10,
+
   },
   input: {
     flex: 1,
@@ -601,4 +645,25 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: '#ccc',
   },
+  emptyChatContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 200,
+  },
+
+  emptyChatTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#888',
+    marginBottom: 5,
+  },
+
+  emptyChatSubtitle: {
+    fontSize: 14,
+    color: '#aaa',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+
 });

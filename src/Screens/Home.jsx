@@ -1,5 +1,4 @@
-import React from 'react';
-import { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +8,6 @@ import {
   Image,
   Alert,
   TouchableOpacity,
-  TextInput,
   StatusBar,
   ActivityIndicator,
   Dimensions,
@@ -17,21 +15,18 @@ import {
   Modal,
   PermissionsAndroid
 } from 'react-native';
-import { useEffect, useState } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 
 import Geolocation from '@react-native-community/geolocation';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import Chat from './Chat'
 import Swiper from 'react-native-swiper';
 import EvilIcons from 'react-native-vector-icons/EvilIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Icon from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
-
 
 // Get device width for responsive UI
 const { width } = Dimensions.get('window');
@@ -39,7 +34,15 @@ const { width } = Dimensions.get('window');
 // Firebase Realtime Database URL
 const FIREBASE_DB_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/';
 
-// Main Home Screen Component
+/**
+ * Home Screen
+ * Main dashboard for the user after login.
+ * Features:
+ * - Shows greeting, user info, address, and notifications
+ * - Displays food categories, popular recipes, latest offers, and promos
+ * - Handles live location updates and address reverse geocoding
+ * - Fetches data from Firebase and updates UI on focus
+ */
 const Home = ({ navigation, route }) => {
   // State variables
   const [foods, setFoods] = useState([]); // All food items
@@ -52,20 +55,19 @@ const Home = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null); // Selected profile image
   const [profileData, setProfileData] = useState({}); // Full profile data
   const isFocused = useIsFocused(); // Navigation focus state
+  const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
+  const [promos, setPromos] = useState([]); // Promo banners
 
   // Ref for geolocation watch
   const watchIdRef = useRef(null);
 
-  const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
-
-
-  const [promos, setPromos] = useState([]);
-
+  /**
+   * Fetch promo banners from Firebase
+   */
   const fetchPromos = async () => {
     try {
       const res = await axios.get(`${FIREBASE_DB_URL}/promos.json`);
       const data = res.data;
-
       if (data) {
         const promoArray = Object.keys(data).map(key => ({
           id: key,
@@ -78,31 +80,15 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good Morning !');
-    else if (hour < 18) setGreeting('Good Afternoon !');
-    else setGreeting('Good Evening !');
-
-    if (isFocused) {
-      loadUserData();
-      fetchFoods();
-      fetchLatestOffers();
-      fetchNotificationCount();
-      fetchPromos(); // <-- Add this line
-    }
-  }, [isFocused]);
-
-  // Fetch unread notification count from DB
+  /**
+   * Fetch unread notification count from DB
+   */
   const fetchNotificationCount = async () => {
     try {
       const res = await axios.get(
         `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`
       );
       const data = res.data;
-
       if (data) {
         const unread = Object.values(data).filter(n => n.isRead === false);
         setNotificationCount(unread.length);
@@ -115,7 +101,9 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-  // Fetch all foods from Firebase
+  /**
+   * Fetch all foods from Firebase
+   */
   const fetchFoods = async () => {
     try {
       const response = await axios.get(`${FIREBASE_DB_URL}/foods.json`);
@@ -136,7 +124,9 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-  // Load user data (username, address, profile image, etc.)
+  /**
+   * Load user data (username, address, profile image, etc.)
+   */
   const loadUserData = async () => {
     try {
       const storedUsername = await AsyncStorage.getItem('username');
@@ -161,9 +151,9 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-
-
-
+  /**
+   * Request location permission and watch live location for address updates
+   */
   useEffect(() => {
     const requestLocationPermission = async () => {
       try {
@@ -177,14 +167,10 @@ const Home = ({ navigation, route }) => {
         );
 
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log("✅ Permission granted");
-
           // Start watching location
           watchIdRef.current = Geolocation.watchPosition(
             async (position) => {
               const { latitude, longitude } = position.coords;
-              console.log('📍 Live Location:', latitude, longitude);
-
               try {
                 // Reverse geocode using Nominatim
                 const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
@@ -200,7 +186,6 @@ const Home = ({ navigation, route }) => {
                 });
 
                 const resolvedAddress = response.data?.display_name || 'Unknown Address';
-                console.log('🏠 Address:', resolvedAddress);
                 setAddress(resolvedAddress);
 
                 const storedUsername = await AsyncStorage.getItem('username');
@@ -247,9 +232,6 @@ const Home = ({ navigation, route }) => {
     };
   }, []);
 
-
-
-
   // Static food categories for horizontal scroll
   const foodItems = [
     { id: '1', name: 'Burger', image: require('../img/burger.jpeg'), icon: 'hamburger' },
@@ -260,8 +242,9 @@ const Home = ({ navigation, route }) => {
     { id: '6', name: 'Drinks', image: require('../img/burger.jpeg'), icon: 'cup-water' },
   ];
 
-
-  // Render a single food category item
+  /**
+   * Render a single food category item
+   */
   const renderFoodItem = ({ item }) => (
     <TouchableOpacity
       style={styles.foodItem}
@@ -277,60 +260,55 @@ const Home = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-  // Render a single popular recipe card
-  const renderPopularRecipe = ({ item }) => {
-    console.log("📸 Image URL:", item.image);
-
-    return (
-      <TouchableOpacity
-        style={styles.popularCard}
-        onPress={() =>
-          navigation.navigate('ItemCard', {
-            id: item.id,
-            username: username,
-            address: address,
-          })
-        }
-      >
-        <View style={styles.imageWrapper}>
-          {item.image && <Image source={{ uri: item.image }} style={styles.image} />}
-        </View>
-
-        <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.cardDesc}>{item.description}</Text>
-
-          <View style={styles.cardFooter}>
-            <Text style={styles.cardPrice}>₹{item.price}</Text>
-            <View style={styles.deliveryInfo}>
-              <Ionicons name="time-outline" size={12} color="#667eea" />
-              <Text style={styles.deliveryText}>{item.deliveryTime}</Text>
-            </View>
+  /**
+   * Render a single popular recipe card
+   */
+  const renderPopularRecipe = ({ item }) => (
+    <TouchableOpacity
+      style={styles.popularCard}
+      onPress={() =>
+        navigation.navigate('ItemCard', {
+          id: item.id,
+          username: username,
+          address: address,
+        })
+      }
+    >
+      <View style={styles.imageWrapper}>
+        {item.image && <Image source={{ uri: item.image }} style={styles.image} />}
+      </View>
+      <View style={styles.cardContent}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
         </View>
-      </TouchableOpacity>
-    );
-  };
+        <Text style={styles.cardDesc}>{item.description}</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardPrice}>₹{item.price}</Text>
+          <View style={styles.deliveryInfo}>
+            <Ionicons name="time-outline" size={12} color="#667eea" />
+            <Text style={styles.deliveryText}>{item.deliveryTime}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
-  // Render a single latest offer card
+  /**
+   * Render a single latest offer card
+   */
   const renderLatestOffer = ({ item }) => (
     <TouchableOpacity style={styles.offerCard}>
       <Image source={{ uri: item.image }} style={styles.offerImage} />
       <View style={styles.offerBadge}>
         <Text style={styles.offerText}>{item.offer}</Text>
       </View>
-
       <View style={styles.offerContent}>
         <Text style={styles.offerTitle}>{item.name}</Text>
         <Text style={styles.offerDesc}>{item.description}</Text>
-
         <View style={styles.priceContainer}>
           <Text style={styles.originalPrice}>{item.originalPrice}</Text>
           <Text style={styles.discountedPrice}>{item.discountedPrice}</Text>
@@ -339,7 +317,9 @@ const Home = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-  // Fetch latest offers and merge with food data
+  /**
+   * Fetch latest offers and merge with food data
+   */
   const fetchLatestOffers = async () => {
     try {
       const offerRes = await axios.get(`${FIREBASE_DB_URL}/offers.json`);
@@ -376,7 +356,9 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-  // Main effect: set greeting, load user/foods/offers/notifications on focus
+  /**
+   * Main effect: set greeting, load user/foods/offers/notifications/promos on focus
+   */
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good Morning !');
@@ -384,16 +366,18 @@ const Home = ({ navigation, route }) => {
     else setGreeting('Good Evening !');
 
     if (isFocused) {
-      loadUserData(); // Load profile + address
-      fetchFoods();    // Load food items
-      fetchLatestOffers(); // Load offers
-      fetchNotificationCount(); // Load notifications
+      loadUserData();
+      fetchFoods();
+      fetchLatestOffers();
+      fetchNotificationCount();
+      fetchPromos();
     }
   }, [isFocused]);
 
   // Main UI render
   return (
     <View style={styles.container}>
+
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
 
       {/* Loader Modal while loading */}
@@ -432,22 +416,13 @@ const Home = ({ navigation, route }) => {
                     style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
                   />
                 </TouchableOpacity>
-
                 <View style={styles.userInfo}>
                   <Text style={styles.greeting}>{greeting}</Text>
-                  <View
-                    style={{
-                      width: 100,
-                      height: 25,
-                      overflow: 'hidden',
-                      alignSelf: 'center',
-                    }}
-                  >
+                  <View style={{ width: 100, height: 25, overflow: 'hidden', alignSelf: 'center' }}>
                     <Text style={styles.username}>{username}</Text>
                   </View>
                 </View>
               </View>
-
               <View style={styles.headerActions}>
                 <View style={styles.fixedWrapper}>
                   <TouchableOpacity style={styles.locationBtn}>
@@ -461,7 +436,6 @@ const Home = ({ navigation, route }) => {
                     </Text>
                   </TouchableOpacity>
                 </View>
-
                 <TouchableOpacity
                   style={styles.notificationBtn}
                   onPress={() =>
@@ -513,13 +487,11 @@ const Home = ({ navigation, route }) => {
                           <Text style={styles.promoSubtitle}>{item.title2}</Text>
                           <Text style={styles.promoDesc}>{item.subtitle}</Text>
                         </View>
-
                       </View>
                     </LinearGradient>
                   </View>
                 ))}
               </Swiper>
-
             </View>
 
             {/* Food Categories Horizontal List */}
@@ -558,7 +530,6 @@ const Home = ({ navigation, route }) => {
                 contentContainerStyle={styles.recipesList}
               />
             </View>
-
             {/* Latest Offers Horizontal List */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -575,14 +546,17 @@ const Home = ({ navigation, route }) => {
             </View>
           </ScrollView>
         </>
+        
       )}
+        <Chat  />
+
     </View>
   );
-
 };
 
 export default Home;
 
+// ...styles remain unchanged...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -669,7 +643,6 @@ const styles = StyleSheet.create({
     marginLeft: 3,
     flexShrink: 1,
   },
-
   notificationBtn: {
     position: 'relative',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -817,10 +790,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-
-
-
-
   },
   foodName: {
     fontSize: 12,

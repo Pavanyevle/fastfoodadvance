@@ -46,7 +46,7 @@ const ReferScreen = ({ navigation,route }) => {
     const handleShare = async () => {
         try {
             const result = await Share.share({
-                message: `Get ₹100 off your first order on FastFood! Use my code ${referralCode} while signing up. Download now: https://fastfood.app.link/referral`,
+message: `Get your first order FREE on FastFood! Use my code ${referralCode} while signing up. Download now: https://fastfood.app.link/referral`,
             });
             if (result.action === Share.sharedAction) {
                 console.log('Shared successfully!');
@@ -64,17 +64,18 @@ const ReferScreen = ({ navigation,route }) => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerText}>Refer & Earn</Text>
+<Text style={styles.headerText}>Refer & Get Free Order</Text>
                 </View>
             </LinearGradient>
 
             <View style={styles.content}>
                 <Image source={require('../img/refer.png')} style={styles.image} />
 
-                <Text style={styles.title}>Earn ₹100 For Every Friend!</Text>
-                <Text style={styles.subtitle}>
-                    Invite your friends and earn rewards when they place their first order.
-                </Text>
+<Text style={styles.title}>Get Free Order For Every Friend!</Text>
+               <Text style={styles.subtitle}>
+  Invite your friends and get your next order absolutely FREE when they order for the first time!
+</Text>
+
 
                 <View style={styles.referralBox}>
                     <Text style={styles.referralLabel}>Your Referral Code</Text>
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         padding: 6,
-        marginRight: 70,
+        marginRight: 50,
         backgroundColor: 'rgba(255,255,255,0.2)',
         borderRadius: 20,
     },
