@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+
 import axios from 'axios';
 import {
   View,
@@ -49,6 +51,8 @@ const PopularRecipesScreen = ({ navigation, route }) => {
   // Modal message and last added item (not used in UI)
   const [modalMessage, setModalMessage] = useState('');
   const [lastAddedItemId, setLastAddedItemId] = useState(null);
+  const [cartCount, setCartCount] = useState(0);
+
 
   /**
    * Navigate to OrderScreen (cart)
@@ -66,45 +70,7 @@ const PopularRecipesScreen = ({ navigation, route }) => {
    * If already in cart, increase quantity
    * Shows modal on success
    */
-  const handleAddToCart = async (item) => {
-    try {
-      const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart.json`
-      );
-
-      // Check if food already in cart
-      const existingItemKey = res.data
-        ? Object.keys(res.data).find(
-            key => res.data[key].foodId === item.id
-          )
-        : null;
-
-      if (existingItemKey) {
-        // Food already in cart → Increase quantity
-        const currentQty = res.data[existingItemKey].quantity || 1;
-        await axios.patch(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${existingItemKey}.json`,
-          {
-            quantity: currentQty + 1,
-          }
-        );
-      } else {
-        // Food not in cart → Add it with quantity 1
-        await axios.put(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`,
-          {
-            foodId: item.id,
-            quantity: 1,
-          }
-        );
-      }
-
-      setShowModal(true);
-    } catch (error) {
-      console.log('Error adding to cart:', error);
-      alert('Failed to add item');
-    }
-  };
+  // 
 
   /**
    * Load username and address from AsyncStorage
@@ -130,59 +96,140 @@ const PopularRecipesScreen = ({ navigation, route }) => {
    * Updates Firebase and local state
    * If quantity is 0, removes item from cart
    */
-  const handleQuantityChange = async (item, change) => {
-    const currentQty = quantities[item.id] || 0;
-    const newQty = Math.max(0, currentQty + change);
+ const handleQuantityChange = async (item, change) => {
+  const currentQty = quantities[item.id] || 0;
+  const newQty = Math.max(0, currentQty + change);
 
-    try {
-      if (newQty === 0) {
-        await axios.delete(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`
-        );
-      } else {
-        await axios.put(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`,
-          {
-            foodId: item.id,
-            quantity: newQty,
-          }
-        );
+  try {
+    if (newQty === 0) {
+      // 🗑️ Firebase मधून delete
+      await axios.delete(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`
+      );
+
+      // 🔻 Cart count कमी कर
+      setCartCount(prev => Math.max(0, prev - 1));
+
+    } else {
+      // 🛒 Firebase मध्ये PUT कर
+      await axios.put(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart/${item.id}.json`,
+        {
+          foodId: item.id,
+          quantity: newQty,
+        }
+      );
+
+      // 🔺 पहिल्यांदाच Add केलं का?
+      if (currentQty === 0 && newQty === 1) {
+        setCartCount(prev => prev + 1);
       }
+    }
 
-      setQuantities(prev => ({
-        ...prev,
-        [item.id]: newQty,
-      }));
+    // ✅ UI साठी local quantity update कर
+    setQuantities(prev => ({
+      ...prev,
+      [item.id]: newQty,
+    }));
+    
+  } catch (error) {
+    console.error('Failed to update quantity:', error);
+    alert('Failed to update cart');
+  }
+};
+
+  useEffect(() => {
+  const fetchCartCount = async () => {
+    try {
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart.json`
+      );
+
+      if (res.data) {
+        const count = Object.keys(res.data).length;
+        setCartCount(count);
+      } else {
+        setCartCount(0);
+      }
     } catch (error) {
-      console.error('Failed to update quantity:', error);
+      console.error('Error fetching cart count:', error);
+      setCartCount(0);
     }
   };
+
+  if (username) {
+    fetchCartCount();
+  }
+}, [username, showModal]); // Modal show झालं की count update कर
+
 
   /**
    * Fetch all popular recipes (foods) from Firebase on mount
    */
-  useEffect(() => {
-    const fetchPopularRecipes = async () => {
+ useEffect(() => {
+  const fetchPopularRecipes = async () => {
+    try {
+      const endpoint = title
+        ? `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/${title}.json`
+        : `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json`;
+
+      const res = await axios.get(endpoint);
+
+      if (res.data) {
+        const recipeArray = Object.keys(res.data).map(key => ({
+          id: key,
+          ...res.data[key],
+        }));
+        setPopularRecipes(recipeArray);
+      } else {
+        setPopularRecipes([]);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setPopularRecipes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchPopularRecipes();
+}, [title]);
+
+useFocusEffect(
+  useCallback(() => {
+    const fetchCartOnFocus = async () => {
       try {
         const res = await axios.get(
-          'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json'
+          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/cart.json`
         );
+
         if (res.data) {
-          const recipeArray = Object.keys(res.data).map(key => ({
-            id: key,
-            ...res.data[key],
-          }));
-          setPopularRecipes(recipeArray);
+          const newQuantities = {};
+          let itemCount = 0;
+
+          Object.entries(res.data).forEach(([key, value]) => {
+            if (value.foodId && value.quantity) {
+              newQuantities[value.foodId] = value.quantity;
+              itemCount++;
+            }
+          });
+
+          setQuantities(newQuantities);
+          setCartCount(itemCount);
+        } else {
+          setQuantities({});
+          setCartCount(0);
         }
-      } catch (err) {
-        console.error('Error fetching foods:', err);
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch cart on screen focus:', error);
       }
     };
 
-    fetchPopularRecipes();
-  }, []);
+    if (username) {
+      fetchCartOnFocus();
+    }
+  }, [username])
+);
 
   /**
    * Render a single recipe card in the grid
@@ -276,11 +323,10 @@ const PopularRecipesScreen = ({ navigation, route }) => {
 const filteredRecipes = popularRecipes.filter(item => {
   const categoryFromItem = item.category?.toLowerCase().replace(/\s+/g, '').trim() || '';
   const titleParam = title?.toLowerCase().replace(/\s+/g, '').trim() || '';
-
-
   if (!titleParam) return true;
   return categoryFromItem === titleParam;
 });
+
 
 
   // Main UI render
@@ -334,14 +380,17 @@ const filteredRecipes = popularRecipes.filter(item => {
       )}
 
       {/* View Cart button at bottom */}
-      <View style={styles.viewCartWrapper}>
-        <TouchableOpacity style={styles.viewCartButton} onPress={handleViewCart}>
-          <LinearGradient colors={['#667eea', '#764ba2']} style={styles.viewCartGradient}>
-            <Ionicons name="cart-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.viewCartText}>View Cart</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+      {cartCount > 0 && (
+  <View style={styles.viewCartWrapper}>
+    <TouchableOpacity style={styles.viewCartButton} onPress={handleViewCart}>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.viewCartGradient}>
+        <Ionicons name="cart-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+        <Text style={styles.viewCartText}>View Cart ({cartCount})</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </View>
+)}
+
 
       {/* Modal for "Added to Cart" confirmation */}
       <Modal visible={showModal} transparent animationType="fade">

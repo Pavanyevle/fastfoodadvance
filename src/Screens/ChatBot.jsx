@@ -67,21 +67,30 @@ const ChatBot = ({ navigation }) => {
    * Returns a formatted string list of available foods
    */
   const fetchFoodItems = async () => {
-    try {
-      const res = await axios.get('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json');
-      const data = res.data;
-      if (data) {
-        const foodList = Object.entries(data)
-          .filter(([id, item]) => item.available)
-          .map(([id, item]) => `• [${id}] ${item.name} (${item.category})`);
-        return foodList.join('\n');
-      } else {
-        return "No food items are currently available.";
-      }
-    } catch (error) {
-      return "Error fetching food items.";
+  try {
+    const res = await axios.get('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json');
+    const data = res.data;
+    if (data) {
+      const foodList = Object.entries(data)
+        .filter(([id, item]) => item.available)
+        .map(([id, item]) => `• [${id}] ${item.name} (${item.category})`);
+
+      const finalList = foodList.join('\n');
+      
+      // ✅ DEBUGGING LOG:
+      console.log('🍔 Food items sent to AI:\n', finalList);
+
+      return finalList;
+    } else {
+      console.log('⚠️ No food items found in database.');
+      return "No food items are currently available.";
     }
-  };
+  } catch (error) {
+    console.error("❌ Error fetching food items:", error);
+    return "Error fetching food items.";
+  }
+};
+
 
 
   useEffect(() => {
@@ -106,7 +115,7 @@ const ChatBot = ({ navigation }) => {
    * On mount: fetch chat history from Firebase
    */
   useEffect(() => {
-    if (!username) return; // username तयार नसताना history fetch करू नको
+    if (!username) return; 
 
     const fetchChatHistory = async () => {
       try {

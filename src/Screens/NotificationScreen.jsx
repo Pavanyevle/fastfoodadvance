@@ -30,6 +30,19 @@ const NotificationScreen = ({ navigation, route }) => {
   // Loading state for fetching notifications
   const [loading, setLoading] = useState(true);
 
+
+  const EmptyNotification = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center',  }}>
+    <Ionicons name="notifications-off-outline" size={64} color="#c1c7d0" />
+    <Text style={{ fontSize: 18, color: '#667eea', marginTop: 12, fontWeight: '600' }}>
+      No Notifications Yet
+    </Text>
+    <Text style={{ fontSize: 14, color: '#95a5a6', marginTop: 4, textAlign: 'center', paddingHorizontal: 40, }}>
+      You're all caught up. We'll notify you when something new arrives.
+    </Text>
+  </View>
+);
+
   /**
    * Handle notification press
    * Marks notification as read in Firebase and refreshes the list
@@ -151,21 +164,23 @@ const NotificationScreen = ({ navigation, route }) => {
 
       {/* Loader while fetching notifications */}
       {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={{ fontSize: 16, color: '#667eea', marginBottom: 10 }}>Loading Notifications...</Text>
-          <StatusBar barStyle="dark-content" />
-        </View>
-      ) : (
-        // Notifications list
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.id}
-          renderItem={renderNotification}
-          contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <ActivityIndicator size="large" color="#667eea" />
+    <Text style={{ fontSize: 16, color: '#667eea', marginBottom: 10 }}>Loading Notifications...</Text>
+    <StatusBar barStyle="dark-content" />
+  </View>
+) : notifications.length === 0 ? (
+  <EmptyNotification />
+) : (
+  <FlatList
+    data={notifications}
+    keyExtractor={(item) => item.id}
+    renderItem={renderNotification}
+    contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+    showsVerticalScrollIndicator={false}
+  />
+)}
+
     </SafeAreaView>
   );
 };
@@ -183,8 +198,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+   
     elevation: 6,
     shadowColor: '#000',
     shadowOpacity: 0.1,

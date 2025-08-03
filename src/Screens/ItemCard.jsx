@@ -34,11 +34,13 @@ const FoodDetailScreen = ({ navigation, route }) => {
   // State for food details
   const [food, setFood] = useState(null);
   // State for selected quantity
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(0);
   // Loading state for fetching food data
   const [loading, setLoading] = useState(true);
   // Modal state for "Added to Cart" confirmation
   const [showModal, setShowModal] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
 
   /**
    * Handle "Order Now" button press
@@ -55,6 +57,40 @@ const FoodDetailScreen = ({ navigation, route }) => {
       });
     } catch (error) {
       console.error("Order Now Failed:", error);
+    }
+  };
+
+  const increment = async () => {
+    const newQty = quantity + 1;
+    setQuantity(newQty);
+
+    try {
+      await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`, {
+        foodId: id,
+        quantity: newQty,
+      });
+      console.log("✅ Quantity updated in Firebase:", newQty);
+    } catch (error) {
+      console.error("❌ Error updating quantity:", error);
+    }
+  };
+
+
+
+  const decrement = async () => {
+    if (quantity > 0) {
+      const newQty = quantity - 1;
+      setQuantity(newQty);
+
+      try {
+        await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`, {
+          foodId: id,
+          quantity: newQty,
+        });
+        console.log("✅ Quantity decreased in Firebase:", newQty);
+      } catch (error) {
+        console.error("❌ Error decreasing quantity:", error);
+      }
     }
   };
 
@@ -89,23 +125,39 @@ const FoodDetailScreen = ({ navigation, route }) => {
    * Fetch food details from Firebase on mount
    */
   useEffect(() => {
-    const fetchFood = async () => {
+    const fetchFoodAndCart = async () => {
       try {
-        const res = await axios.get(`${FIREBASE_DB_URL}/foods/${id}.json`);
-        if (res.data) setFood(res.data);
+        const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${id}.json`);
+        if (foodRes.data) setFood(foodRes.data);
+
+        const cartRes = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart/${id}.json`);
+        if (cartRes.data?.quantity !== undefined) {
+          setQuantity(cartRes.data.quantity);
+        }
+
+        // ✅ FETCH total cart count
+        const fullCart = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+        if (fullCart.data) {
+          const itemCount = Object.keys(fullCart.data).length;
+          setCartCount(itemCount);
+        } else {
+          setCartCount(0);
+        }
+
       } catch (error) {
-        console.error(error);
+        console.error("❌ Error fetching food/cart data:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchFood();
+
+    fetchFoodAndCart();
   }, [id]);
 
+
+
   // Increment quantity
-  const increment = () => setQuantity(prev => prev + 1);
   // Decrement quantity (min 1)
-  const decrement = () => quantity > 1 && setQuantity(prev => prev - 1);
 
   // Show loader while fetching food data
   if (loading) {
@@ -127,103 +179,101 @@ const FoodDetailScreen = ({ navigation, route }) => {
 
   // Main UI render
   return (
-    <View style={{flex:1}}>
-    <SafeAreaView style={styles.screen}>
-      <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={styles.screen}>
+        <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
 
-      {/* Header with back button */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Scrollable content with food image and details */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Food image with overlay */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: food.image }} style={styles.foodImage} />
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.imageOverlay} />
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
 
-        {/* Food details section */}
-        <View style={styles.content}>
-          <Text style={styles.foodTitle}>{food.name}</Text>
-          <Text style={styles.foodSubtitle}>{food.description}</Text>
+        {/* Scrollable content with food image and details */}
+        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          {/* Food image with overlay */}
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: food.image }} style={styles.foodImage} />
+            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.imageOverlay} />
+          </View>
 
-          {/* Nutrition info */}
-          <View style={styles.nutritionContainer}>
-            {['Fats', 'Carbs', 'Protein'].map((label, idx) => (
-              <View key={idx} style={styles.nutrientBox}>
-                <Text style={styles.nutrientLabel}>{label}</Text>
-                <Text style={styles.nutrientValue}>{food[label.toLowerCase()]}g</Text>
+          {/* Food details section */}
+          <View style={styles.content}>
+            <Text style={styles.foodTitle}>{food.name}</Text>
+            <Text style={styles.foodSubtitle}>{food.description}</Text>
+
+            {/* Nutrition info */}
+            <View style={styles.nutritionContainer}>
+              {['Fats', 'Carbs', 'Protein'].map((label, idx) => (
+                <View key={idx} style={styles.nutrientBox}>
+                  <Text style={styles.nutrientLabel}>{label}</Text>
+                  <Text style={styles.nutrientValue}>{food[label.toLowerCase()]}g</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Delivery time */}
+            <View style={styles.deliveryContainer}>
+              <Text style={styles.deliveryLabel}>Delivery Time:</Text>
+              <Text style={styles.deliveryTime}>{food.preparationTime} mins</Text>
+            </View>
+
+            {/* Quantity selector and price */}
+            <View style={styles.priceQuantityRow}>
+              <View style={styles.quantityContainer}>
+                <TouchableOpacity onPress={decrement} style={styles.qtyBtn}>
+                  <Ionicons name="remove" size={20} color="#667eea" />
+                </TouchableOpacity>
+                <Text style={styles.qtyText}>{quantity}</Text>
+                <TouchableOpacity onPress={increment} style={styles.qtyBtn}>
+                  <Ionicons name="add" size={20} color="#667eea" />
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
 
-          {/* Delivery time */}
-          <View style={styles.deliveryContainer}>
-            <Text style={styles.deliveryLabel}>Delivery Time:</Text>
-            <Text style={styles.deliveryTime}>{food.preparationTime} mins</Text>
-          </View>
-
-          {/* Quantity selector and price */}
-          <View style={styles.priceQuantityRow}>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity onPress={decrement} style={styles.qtyBtn}>
-                <Ionicons name="remove" size={20} color="#667eea" />
-              </TouchableOpacity>
-              <Text style={styles.qtyText}>{quantity}</Text>
-              <TouchableOpacity onPress={increment} style={styles.qtyBtn}>
-                <Ionicons name="add" size={20} color="#667eea" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Price</Text>
-              <Text style={styles.priceValue}>₹{(parseInt(food.price) * quantity).toFixed(0)}</Text>
+              <View style={styles.priceContainer}>
+                <Text style={styles.priceLabel}>Price</Text>
+                <Text style={styles.priceValue}>₹{food.price}</Text>
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      {/* Action buttons: Add to Cart & View Cart */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.buttonContainer} onPress={() => setShowModal(true)}>
-          <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.buttonGradient}>
-            <Text style={styles.buttonText}>Add to Cart</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Action buttons: Add to Cart & View Cart */}
 
-        <TouchableOpacity style={styles.buttonContainer} onPress={handleOrderNow}>
-          <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.buttonGradient}>
-            <Text style={styles.buttonText}>View Cart</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
-      {/* Modal for "Added to Cart" confirmation */}
-      <Modal visible={showModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Ionicons name="checkmark-circle" size={60} color="#22c55e" />
-            <Text style={styles.modalTitle}>Added to Cart</Text>
-            <TouchableOpacity style={styles.buttonContainer} onPress={addToCart}>
-              <LinearGradient colors={["#667eea", "#764ba2"]} style={{
-                paddingVertical: 12,
-                borderRadius: 10,
-                width: 70,
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}>
-                <Text style={styles.buttonText}>OK</Text>
+        {quantity > 0 && (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.buttonContainer} onPress={handleOrderNow}>
+              <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.buttonGradient}>
+                <Text style={styles.buttonText}>View Cart</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
-<Chat/>
+        )}
+
+
+        {/* Modal for "Added to Cart" confirmation */}
+        <Modal visible={showModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Ionicons name="checkmark-circle" size={60} color="#22c55e" />
+              <Text style={styles.modalTitle}>Added to Cart</Text>
+              <TouchableOpacity style={styles.buttonContainer} onPress={addToCart}>
+                <LinearGradient colors={["#667eea", "#764ba2"]} style={{
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  width: 70,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <Text style={styles.buttonText}>OK</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+      <Chat />
     </View>
   );
 };
@@ -252,7 +302,7 @@ const styles = StyleSheet.create({
     borderRadius: 25
   },
   scrollContainer: {
-   
+
   },
   imageContainer: {
     height: 350,

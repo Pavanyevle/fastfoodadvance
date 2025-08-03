@@ -126,10 +126,11 @@ const PaymentScreen = ({ navigation, route }) => {
 
       setIsSavingOrder(false);
       setConfirmationVisible(false);
-      navigation.replace('MainTabs', {
-        orderId: itemIds,
-        username: username,
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs', params: { orderId: itemIds, username } }],
       });
+
 
     } catch (err) {
       setIsSavingOrder(false);
@@ -702,26 +703,26 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '360deg' }],
   },
   loaderOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-loaderBox: {
-  backgroundColor: '#fff',
-  padding: 30,
-  borderRadius: 16,
-  alignItems: 'center',
-  width: '80%',
-  elevation: 10,
-},
-loaderText: {
-  marginTop: 16,
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#334155',
-  textAlign: 'center',
-},
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderBox: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    width: '80%',
+    elevation: 10,
+  },
+  loaderText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
 
 });
 

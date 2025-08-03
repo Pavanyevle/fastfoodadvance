@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+
 import {
   View,
   Text,
@@ -23,29 +25,54 @@ import Chat from './Chat'
  * EmptyCartIllustration
  * Shows an illustration and message when the cart is empty.
  */
-const EmptyCartIllustration = () => (
+const EmptyCartIllustration = ({ onBrowsePress }) => (
   <View style={{
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   }}>
+    <Ionicons name="cart-outline" size={80} color="#667eea" />
     <Text style={{
-      fontSize: 18,
-      color: '#667eea',
-      marginTop: 10,
+      fontSize: 20,
+      color: '#1e293b',
+      fontWeight: '600',
       textAlign: 'center',
     }}>
       Your cart is empty!
     </Text>
+    <Text style={{
+      fontSize: 14,
+      color: '#64748b',
+      marginTop: 6,
+      textAlign: 'center',
+    }}>
+      Add delicious food items to get started.
+    </Text>
 
-    {/* Optional: Go to Home Button
     <TouchableOpacity
-      style={{ marginTop: 20 }}
-      onPress={() => console.log("Go to Home tapped")}
+      onPress={onBrowsePress}
+      style={{
+        marginTop: 25,
+        backgroundColor: '#667eea',
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 25,
+        shadowColor: '#667eea',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 6,
+      }}
     >
-      <Text style={{ color: '#667eea', fontSize: 16 }}>Order Now</Text>
-    </TouchableOpacity> */}
+      <Text style={{
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+      }}>
+        Browse Items
+      </Text>
+    </TouchableOpacity>
   </View>
 );
 
@@ -143,6 +170,42 @@ const OrderScreen = ({ navigation, route }) => {
       console.error("Error updating quantity:", err);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchCartItems = async (user) => {
+        try {
+          const res = await axios.get(`${FIREBASE_DB_URL}/users/${user}/cart.json`);
+          if (res.data) {
+            const foodEntries = Object.entries(res.data);
+            const foodDetailsPromises = foodEntries.map(async ([key, value]) => {
+              const foodId = value.foodId;
+              const quantity = value.quantity || 1;
+              const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${foodId}.json`);
+              const price = parseInt(foodRes.data.price);
+              return {
+                ...foodRes.data,
+                id: foodId,
+                price,
+                quantity,
+                total: `₹${price * quantity}`,
+              };
+            });
+            const foodDetails = await Promise.all(foodDetailsPromises);
+            setCartItems(foodDetails.reverse());
+          } else {
+            setCartItems([]);
+          }
+        } catch (error) {
+          console.error("Error refreshing cart items:", error);
+        }
+      };
+
+      if (username) {
+        fetchCartItems(username);
+      }
+    }, [username]) // 👈 username बदलला तरही fetch होईल
+  );
 
   /**
    * Fetch cart items, quantity, and address on mount
@@ -266,35 +329,49 @@ const OrderScreen = ({ navigation, route }) => {
    * Handle quantity change for a cart item (updates local and Firebase)
    */
   const handleQuantityChange = async (itemId, change) => {
-    const updatedItems = cartItems.map(item => {
-      if (item.id === itemId) {
-        const newQuantity = Math.max(1, item.quantity + change);
-        const updatedTotal = item.price * newQuantity;
-        return {
-          ...item,
+    let updatedCartItems = [...cartItems];
+    const index = updatedCartItems.findIndex(item => item.id === itemId);
+
+    if (index !== -1) {
+      const currentItem = updatedCartItems[index];
+      const newQuantity = currentItem.quantity + change;
+
+      // ✅ UI ला लगेच update करा (Optimistic Update)
+      if (newQuantity <= 0) {
+        updatedCartItems.splice(index, 1);
+      } else {
+        updatedCartItems[index] = {
+          ...currentItem,
           quantity: newQuantity,
-          total: `₹${updatedTotal}`,
+          total: `₹${newQuantity * currentItem.price}`,
         };
       }
-      return item;
-    });
 
-    setCartItems(updatedItems);
+      setCartItems(updatedCartItems); // ✅ First update UI
 
-    try {
-      const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
-      if (res.data) {
-        const key = Object.keys(res.data).find(k => res.data[k].foodId === itemId);
-        if (key) {
-          await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`, {
-            quantity: updatedItems.find(i => i.id === itemId).quantity,
-          });
+      try {
+        // ✅ Then update Firebase (Backend)
+        const res = await axios.get(`${FIREBASE_DB_URL}/users/${username}/cart.json`);
+        if (res.data) {
+          const key = Object.keys(res.data).find(k => res.data[k].foodId === itemId);
+
+          if (key) {
+            if (newQuantity <= 0) {
+              await axios.delete(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`);
+            } else {
+              await axios.patch(`${FIREBASE_DB_URL}/users/${username}/cart/${key}.json`, {
+                quantity: newQuantity,
+              });
+            }
+          }
         }
+      } catch (err) {
+        console.error("❌ Firebase update error:", err);
+        // Optional: तू error झाल्यावर पुन्हा UI rollback करू शकतोस
       }
-    } catch (err) {
-      console.error("Error updating Firebase quantity:", err);
     }
   };
+
 
   // Delivery address options (currently only Home)
   const deliveryAddresses = [
@@ -327,12 +404,14 @@ const OrderScreen = ({ navigation, route }) => {
             <TouchableOpacity style={styles.quantityBtn} onPress={() => handleQuantityChange(item.id, -1)}>
               <Ionicons name="remove" size={16} color="#667eea" />
             </TouchableOpacity>
-            <Text style={styles.quantityText}>{item.quantity}</Text>
+            <Text style={styles.quantityText}>
+              {item.quantity > 0 ? item.quantity : 0}
+            </Text>
             <TouchableOpacity style={styles.quantityBtn} onPress={() => handleQuantityChange(item.id, 1)}>
               <Ionicons name="add" size={16} color="#667eea" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.itemTotal}>{item.total}</Text>
+          <Text style={styles.itemTotal}>{item.price}</Text>
         </View>
       </View>
 
@@ -391,7 +470,7 @@ const OrderScreen = ({ navigation, route }) => {
               <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>Your Order</Text>
+              <Text style={styles.headerTitle}>Your Cart</Text>
               <Text style={styles.headerSubtitle}>Review and place your order</Text>
             </View>
           </View>
@@ -406,7 +485,7 @@ const OrderScreen = ({ navigation, route }) => {
             </Text>
           </View>
         ) : cartItems.length === 0 ? (
-          <EmptyCartIllustration />
+  <EmptyCartIllustration onBrowsePress={() => navigation.navigate('PopularRecipesScreen', { username, address })} />
         ) : (
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Cart Items Section */}
@@ -420,6 +499,30 @@ const OrderScreen = ({ navigation, route }) => {
                 contentContainerStyle={styles.cartList}
               />
             </View>
+
+            {/* Add More Items Button */}
+            <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#667eea',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 3,
+                  elevation: 4,
+                }}
+                onPress={() => navigation.navigate('PopularRecipesScreen', { username: username, address: address })}
+              >
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+                  + Add More Items
+                </Text>
+              </TouchableOpacity>
+            </View>
+            4
 
             {/* Delivery Address Section */}
             <View style={styles.section}>

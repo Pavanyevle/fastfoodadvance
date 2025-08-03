@@ -151,7 +151,10 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
       setTimeout(() => {
         AsyncStorage.removeItem('username');
         AsyncStorage.removeItem('address');
-        navigation.navigate('Welcome');
+navigation.reset({
+  index: 0,
+  routes: [{ name: 'Welcome' }],
+});
       }, 1500);
 
     } catch (error) {
@@ -174,57 +177,80 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
   };
 
   // Change password logic
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError('Please fill all fields');
+ const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+
+const handleChangePassword = async () => {
+  setPasswordError('');
+  setLoading(true);
+
+  try {
+    // 🔹 1. Firebase वरून user data घ्या
+    const res = await axios.get(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+    );
+
+    const userData = res.data;
+
+    // 🔹 2. current password verify करा
+    if (!userData || userData.password !== currentPassword) {
+      setPasswordError('Current password is incorrect');
+      setLoading(false);
+      return;
+    }
+
+    // 🔹 3. बाकी validations
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Please enter new and confirm password');
+      setLoading(false);
       return;
     }
 
     if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters');
+      setPasswordError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    // 🔹 4. Strong password check (at least 1 uppercase, lowercase, digit, special char)
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+    if (!strongPasswordRegex.test(newPassword)) {
+      setPasswordError('Password must include uppercase, lowercase, number, and special character');
+      setLoading(false);
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPasswordError('Passwords do not match');
+      setLoading(false);
       return;
     }
 
-    try {
-      // Step 1: Fetch user data from DB
-      const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-      );
+    // 🔹 5. Password update in Firebase
+    await axios.patch(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
+      { password: newPassword }
+    );
 
-      if (res.data && res.data.password === currentPassword) {
-        // Step 2: Update password in DB
-        await axios.patch(
-          `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-          {
-            password: newPassword,
-            passwordUpdatedAt: new Date().toISOString(),
-          }
-        );
+    // 🔹 6. Reset state
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordModal(false);
+    setLoading(false);
 
-        setPasswordError('');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+    setMessageModal({
+      visible: true,
+      type: 'success',
+      message: 'Password updated successfully!',
+    });
 
-        setMessageModal({
-          visible: true,
-          type: 'success',
-          message: 'Password updated successfully!',
-        });
-
-      } else {
-        setPasswordError('Current password is incorrect');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setPasswordError('Something went wrong');
-    }
-  };
+  } catch (error) {
+    console.error('Password change error:', error);
+    setPasswordError('Something went wrong');
+    setLoading(false);
+  }
+};
 
   // Save profile changes to DB
   const handleSave = async () => {
@@ -386,12 +412,7 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
     </View>
   );
 
-  // Placeholder for settings section (not implemented)
-  const renderSettingsSection = () => (
-    <View style={styles.section}>
-      {/* Add settings toggles here if needed */}
-    </View>
-  );
+ 
 
   // Render account actions (change password, help, about)
   const renderAccountActions = () => (
@@ -407,7 +428,7 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
           <Icon name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
         {/* Help & Support */}
-        <TouchableOpacity style={styles.actionItem}>
+        <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('HelpSupportScreen', { username })}>
           <View style={styles.actionInfo}>
             <Icon name="help-circle-outline" size={24} color="#6366f1" />
             <Text style={styles.actionTitle}>Help & Support</Text>
@@ -415,7 +436,8 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
           <Icon name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
         {/* About App */}
-        <TouchableOpacity style={styles.actionItem}>
+        <TouchableOpacity style={styles.actionItem}             onPress={() => navigation.navigate('AboutScreen', { username })}
+>
           <View style={styles.actionInfo}>
             <Icon name="information-circle-outline" size={24} color="#6366f1" />
             <Text style={styles.actionTitle}>About App</Text>
@@ -475,7 +497,6 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {renderProfileHeader()}
         {renderPersonalInfo()}
-        {renderSettingsSection()}
         {renderAccountActions()}
         {renderDangerZone()}
       </ScrollView>
@@ -635,41 +656,8 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
                   justifyContent: 'center',
                   paddingHorizontal: 20,
                 }]}
-                onPress={async () => {
-                  if (!newPassword || newPassword.length < 6) {
-                    setPasswordError('Password must be at least 6 characters long.');
-                    return;
-                  }
+             onPress={handleChangePassword}
 
-                  setPasswordError('');
-                  setPasswordModal(false);
-                  setLoading(true);
-
-                  try {
-                    await axios.patch(
-                      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-                      { password: newPassword }
-                    );
-
-                    setNewPassword('');
-                    setLoading(false);
-
-                    setMessageModal({
-                      visible: true,
-                      type: 'success',
-                      message: 'Password updated successfully!',
-                    });
-
-                  } catch (err) {
-                    console.error('Password update error:', err);
-                    setLoading(false);
-                    setMessageModal({
-                      visible: true,
-                      type: 'error',
-                      message: 'Failed to update password!',
-                    });
-                  }
-                }}
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -722,7 +710,11 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
                       await AsyncStorage.removeItem('address');
                       setLogoutModal(false);
                       setIsLoggingOut(false);
-                      navigation.replace('Welcome');
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Welcome' }],
+                      });
+
                     }, 1500);
                   } catch (err) {
                     console.error('Logout error:', err);

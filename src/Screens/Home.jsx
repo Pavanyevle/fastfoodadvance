@@ -154,83 +154,116 @@ const Home = ({ navigation, route }) => {
   /**
    * Request location permission and watch live location for address updates
    */
-  useEffect(() => {
-    const requestLocationPermission = async () => {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'This app needs access to your location for deliveries.',
-            buttonPositive: 'Allow',
+
+
+  const reverseGeocodeAndUpdateFirebase = async (latitude, longitude) => {
+  try {
+    const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+      params: {
+        lat: latitude,
+        lon: longitude,
+        format: 'json',
+      },
+      headers: {
+        'User-Agent': 'ReactNativeApp/1.0',
+      },
+    });
+
+    const resolvedAddress = response.data?.display_name || 'Unknown Address';
+    setAddress(resolvedAddress);
+
+    const storedUsername = await AsyncStorage.getItem('username');
+    if (storedUsername) {
+      await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
+        address: resolvedAddress,
+        latitude,
+        longitude,
+      });
+    }
+
+    await AsyncStorage.setItem('address', resolvedAddress);
+  } catch (error) {
+    console.log('❌ Reverse geocoding error:', error.message);
+  }
+};
+
+useEffect(() => {
+  const startLocationTracking = async () => {
+    const storedUsername = await AsyncStorage.getItem('username');
+    if (!storedUsername) {
+      console.log('⛔ Username not found');
+      return;
+    }
+
+    setUsername(storedUsername);
+
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+    );
+
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+      // ✅ Use watchPosition for live updates
+      watchIdRef.current = Geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('📍 Live location:', latitude, longitude);
+
+          try {
+            const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+              params: {
+                lat: latitude,
+                lon: longitude,
+                format: 'json',
+              },
+              headers: {
+                'User-Agent': 'ReactNativeApp/1.0',
+              },
+            });
+
+            const resolvedAddress = response.data?.display_name || 'Unknown Address';
+            console.log("📌 Address resolved:", resolvedAddress);
+
+            setAddress(resolvedAddress);
+
+            await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
+              address: resolvedAddress,
+              latitude,
+              longitude,
+            });
+
+            await AsyncStorage.setItem('address', resolvedAddress);
+          } catch (error) {
+            console.log('❌ Reverse geocoding error:', error.message);
           }
-        );
-
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          // Start watching location
-          watchIdRef.current = Geolocation.watchPosition(
-            async (position) => {
-              const { latitude, longitude } = position.coords;
-              try {
-                // Reverse geocode using Nominatim
-                const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-                  params: {
-                    lat: latitude,
-                    lon: longitude,
-                    format: 'json',
-                  },
-                  headers: {
-                    'User-Agent': 'ReactNativeApp/1.0 (pavanyevle6@gmail.com)',
-                    'Accept-Language': 'en',
-                  },
-                });
-
-                const resolvedAddress = response.data?.display_name || 'Unknown Address';
-                setAddress(resolvedAddress);
-
-                const storedUsername = await AsyncStorage.getItem('username');
-                if (storedUsername) {
-                  await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
-                    address: resolvedAddress,
-                    latitude: latitude,
-                    longitude: longitude
-                  });
-                }
-
-                await AsyncStorage.setItem('address', resolvedAddress);
-              } catch (error) {
-                console.log('❌ Reverse geocoding error:', error.message);
-              }
-            },
-            (error) => {
-              console.log('❌ Location error:', error.message);
-            },
-            {
-              enableHighAccuracy: true,
-              distanceFilter: 5,
-              interval: 10000,
-              fastestInterval: 5000,
-              forceRequestLocation: true,
-              showLocationDialog: true,
-            }
-          );
-        } else {
-          console.log('❌ Location permission denied');
+        },
+        (error) => {
+          console.log('❌ watchPosition error:', error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          distanceFilter: 10, // location update every 10 meters
+          interval: 10000,     // every 10 seconds
+          fastestInterval: 5000,
         }
-      } catch (err) {
-        console.log('❌ Location permission error:', err);
-      }
-    };
+      );
+    } else {
+      console.log('❌ Location permission denied');
+    }
+  };
 
-    requestLocationPermission();
+  startLocationTracking();
 
-    return () => {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, []);
+  // 🧹 Clean up watcher when component unmounts
+  return () => {
+    if (watchIdRef.current !== null) {
+      Geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  };
+}, []);
+
+
+
 
   // Static food categories for horizontal scroll
   const foodItems = [
@@ -386,7 +419,7 @@ const Home = ({ navigation, route }) => {
           <View style={styles.loaderOverlay}>
             <View style={styles.loaderBox}>
               <ActivityIndicator size="large" color="#667eea" />
-              <Text style={styles.loaderText}>Loading your dashboard...</Text>
+              <Text style={styles.loaderText}>Loading ...</Text>
             </View>
           </View>
         </Modal>
@@ -476,7 +509,8 @@ const Home = ({ navigation, route }) => {
                 showsPagination={true}
                 dotColor="rgba(255,255,255,0.5)"
                 activeDotColor="#fff"
-                paginationStyle={styles.pagination}
+                paginationStyle={{ bottom: 10, position: 'absolute' }}
+                style={{ height: 170 }}
               >
                 {promos.map((item, index) => (
                   <View key={index} style={styles.slideContainer}>
@@ -546,9 +580,9 @@ const Home = ({ navigation, route }) => {
             </View>
           </ScrollView>
         </>
-        
+
       )}
-        <Chat  />
+      <Chat />
 
     </View>
   );
@@ -696,7 +730,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   sliderContainer: {
-    height: 150,
+    height: 170,
     marginBottom: 20,
   },
   slideContainer: {
@@ -705,7 +739,7 @@ const styles = StyleSheet.create({
   },
   promoCard: {
     borderRadius: 20,
-    height: 150,
+    height: 170,
     overflow: 'hidden',
 
   },
@@ -735,6 +769,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
 
   },
+
   orderBtn: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,

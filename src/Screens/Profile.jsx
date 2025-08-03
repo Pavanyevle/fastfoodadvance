@@ -129,7 +129,10 @@ const ProfileScreen = ({ navigation, route }) => {
       await AsyncStorage.removeItem('address');
       setTimeout(() => {
         setIsSigningOut(false); // Hide loader
-        navigation.replace('Welcome');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Welcome' }],
+        });
       }, 1000); // Delay for smooth UX
     } catch (error) {
       console.error('Sign out error:', error);
@@ -225,19 +228,19 @@ const ProfileScreen = ({ navigation, route }) => {
           <ProfileItem icon="cog" text="Profile Settings" bg="#6366F1" onPress={() => navigation.navigate('ProfileSettingsScreen', { username: name })}
           />
           <ProfileItem icon="history" text="My Orders" bg="#14B8A6" onPress={() => navigation.navigate('OrderHistoryScreen', { username: name })} />
-          <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('Chat', { username: name })} />
+          <ProfileItem icon="question-circle" text="Help & Support" bg="#F59E0B" onPress={() => navigation.navigate('HelpSupportScreen', { username: name ,address: address,})} />
           <ProfileItem
             icon="info-circle"
             text="About"
             bg="#3B82F6"
             onPress={() => navigation.navigate('AboutScreen', { username: name })}
           />
-          <ProfileItem
+          {/* <ProfileItem
             icon="gift"
             text="Refer & Get Free Order"
             bg="#22C55E"
             onPress={() => navigation.navigate('ReferScreen', { username: name })}
-          />
+          /> */}
 
         </View>
 
@@ -282,7 +285,7 @@ const ProfileScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
-              <Chat  />
+      <Chat />
 
     </View>
   );

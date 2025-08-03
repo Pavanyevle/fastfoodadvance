@@ -28,6 +28,7 @@ import Home from './src/Screens/Home';
 import ChatBot from './src/Screens/ChatBot';
 import AboutScreen from './src/Screens/AboutScreen';
 import ReferScreen from './src/Screens/ReferScreen';
+import HelpSupportScreen from './src/Screens/HelpSupportScreen';
 import MainTabNavigator from './src/Navigators/MainTabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -202,6 +203,7 @@ const App = () => {
         <Stack.Screen name="ReferScreen" component={ReferScreen} />
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
         <Stack.Screen name="Chat" component={Chat} />
+        <Stack.Screen name="HelpSupportScreen" component={HelpSupportScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>
