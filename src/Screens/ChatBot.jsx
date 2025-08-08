@@ -17,18 +17,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// GROQ API key for AI assistant (replace with your own key in production)
-const GROQ_API_KEY = ''; // Replace with your actual GROQ API key
+const GROQ_API_KEY = ''; 
 
-/**
- * ChatBot screen
- * Provides a chat interface for users to interact with an AI assistant.
- * Features:
- * - Loads/saves chat history from Firebase
- * - Fetches food menu and user orders for context
- * - Sends user messages to AI API and displays responses
- * - Shows typing indicator and handles loading states
- */
+
 const ChatBot = ({ navigation }) => {
   // State for chat messages
   const [messages, setMessages] = useState([]);
