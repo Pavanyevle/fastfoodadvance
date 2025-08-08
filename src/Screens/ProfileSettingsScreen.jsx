@@ -18,6 +18,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import storage from '@react-native-firebase/storage';
+
 
 /**
  * ProfileSettingsScreen
@@ -920,7 +922,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   multilineInput: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
   },
   editActions: {

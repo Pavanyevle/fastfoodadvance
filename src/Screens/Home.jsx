@@ -13,7 +13,8 @@ import {
   Dimensions,
   Platform,
   Modal,
-  PermissionsAndroid
+  PermissionsAndroid,
+  Linking
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 
@@ -57,9 +58,436 @@ const Home = ({ navigation, route }) => {
   const isFocused = useIsFocused(); // Navigation focus state
   const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
   const [promos, setPromos] = useState([]); // Promo banners
+  const [locationLoading, setLocationLoading] = useState(false); // Location loading state
+  const [locationStatus, setLocationStatus] = useState('idle'); // idle, loading, success, error
 
   // Ref for geolocation watch
   const watchIdRef = useRef(null);
+
+  /**
+   * Check if location services are enabled
+   */
+  const checkLocationServices = () => {
+    return new Promise((resolve) => {
+      Geolocation.getCurrentPosition(
+        () => resolve(true),
+        () => resolve(false),
+        { timeout: 5000, maximumAge: 0 }
+      );
+    });
+  };
+
+  /**
+   * Request location permission for Android with proper handling
+   */
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        // Check if location services are enabled first
+        const locationEnabled = await checkLocationServices();
+        if (!locationEnabled) {
+        
+          return false;
+        }
+
+        // Request permissions
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'SpeedyBite needs access to your location to provide accurate delivery services',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          return true;
+        } else if (granted === PermissionsAndroid.RESULTS.DENIED) {
+         
+          return false;
+        } else {
+          return false;
+        }
+      } catch (err) {
+        console.warn('Permission request error:', err);
+     
+        return false;
+      }
+    }
+    return true; // iOS handles permissions differently
+  };
+
+  /**
+   * Get exact location with improved accuracy and error handling
+   */
+  const getExactLocation = () => {
+    return new Promise((resolve, reject) => {
+      // First try with high accuracy
+      const highAccuracyOptions = {
+        enableHighAccuracy: true,
+        timeout: 30000, // Reduced to 30 seconds
+        maximumAge: 0, // Force fresh location
+        distanceFilter: 0, // Get every location change
+        forceRequestLocation: true, // Force location request
+      };
+
+      // Fallback options with lower accuracy
+      const fallbackOptions = {
+        enableHighAccuracy: false,
+        timeout: 15000, // 15 seconds for fallback
+        maximumAge: 60000, // Accept location up to 1 minute old
+        distanceFilter: 10, // 10 meters
+      };
+
+      const tryGetLocation = (options, isFallback = false) => {
+        Geolocation.getCurrentPosition(
+          (position) => {
+            console.log('📍 Location obtained:', position.coords);
+            console.log('📍 Accuracy:', position.coords.accuracy, 'meters');
+            console.log('📍 Timestamp:', new Date(position.timestamp).toLocaleString());
+            console.log('📍 Using fallback:', isFallback);
+            
+            // Check if accuracy is acceptable
+            if (position.coords.accuracy > 100 && !isFallback) {
+              console.warn('⚠️ Poor accuracy, trying fallback...');
+              tryGetLocation(fallbackOptions, true);
+              return;
+            }
+            
+            resolve(position.coords);
+          },
+          (error) => {
+            console.error('❌ Location error:', error);
+            
+            // If high accuracy failed, try fallback
+            if (!isFallback) {
+              console.log('🔄 Trying fallback location...');
+              tryGetLocation(fallbackOptions, true);
+              return;
+            }
+            
+            let errorMessage = 'Unable to get your location.';
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location permission denied. Please enable location access.';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information unavailable. Please check your GPS settings.';
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'Location request timed out. Please try again.';
+                break;
+              default:
+                errorMessage = 'Location error occurred. Please try again.';
+            }
+            
+            reject(new Error(errorMessage));
+          },
+          options
+        );
+      };
+
+      // Start with high accuracy
+      tryGetLocation(highAccuracyOptions);
+    });
+  };
+
+  /**
+   * Get network-based location as last resort
+   */
+  const getNetworkLocation = () => {
+    return new Promise((resolve, reject) => {
+      const networkOptions = {
+        enableHighAccuracy: false,
+        timeout: 10000, // 10 seconds
+        maximumAge: 300000, // Accept location up to 5 minutes old
+        distanceFilter: 100, // 100 meters
+      };
+
+      Geolocation.getCurrentPosition(
+        (position) => {
+          console.log('🌐 Network location obtained:', position.coords);
+          console.log('🌐 Accuracy:', position.coords.accuracy, 'meters');
+          resolve(position.coords);
+        },
+        (error) => {
+          console.error('❌ Network location error:', error);
+          reject(new Error('Network location unavailable'));
+        },
+        networkOptions
+      );
+    });
+  };
+
+  /**
+   * Reverse geocode coordinates to address using multiple services with improved error handling
+   */
+  const reverseGeocode = async (latitude, longitude) => {
+    try {
+      console.log('🌍 Reverse geocoding for:', latitude, longitude);
+      
+      // Try OpenStreetMap first
+      const osmResponse = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse`,
+        {
+          params: {
+            lat: latitude,
+            lon: longitude,
+            format: 'json',
+            addressdetails: 1,
+            zoom: 18, // Get detailed address
+            'accept-language': 'en' // Request English results
+          },
+          headers: {
+            'User-Agent': 'SpeedyBite/1.0',
+          },
+          timeout: 15000, // Increased timeout to 15 seconds
+        }
+      );
+
+      if (osmResponse.data && osmResponse.data.display_name) {
+        console.log('✅ Address resolved:', osmResponse.data.display_name);
+        return osmResponse.data.display_name;
+      }
+
+      // Fallback to coordinates if geocoding fails
+      console.log('⚠️ Geocoding failed, using coordinates');
+      return `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    } catch (error) {
+      console.error('❌ Reverse geocoding error:', error);
+      return `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    }
+  };
+
+  /**
+   * Update location in Firebase and AsyncStorage
+   */
+  const updateLocationInStorage = async (latitude, longitude, address) => {
+    try {
+      if (username) {
+        await axios.patch(
+          `${FIREBASE_DB_URL}/users/${username}.json`,
+          {
+            address:address,
+            currentLocation: {
+              latitude,
+              longitude,
+              address,
+              lastUpdated: new Date().toISOString()
+            }
+          }
+        );
+      }
+
+      await AsyncStorage.setItem('userLocation', JSON.stringify({
+        latitude,
+        longitude,
+        address
+      }));
+
+      await AsyncStorage.setItem('address', address);
+      console.log('✅ Location updated in storage');
+    } catch (error) {
+      console.error('❌ Error updating location storage:', error);
+    }
+  };
+
+  /**
+   * Debug location services and permissions
+   */
+  const debugLocationServices = async () => {
+    try {
+      console.log('🔍 Debugging location services...');
+      
+      // Check if geolocation is available
+      if (!Geolocation) {
+        console.error('❌ Geolocation not available');
+        return;
+      }
+
+      // Check permissions
+      const hasPermission = await requestLocationPermission();
+      console.log('📍 Permission status:', hasPermission);
+
+      // Check location services
+      const locationEnabled = await checkLocationServices();
+      console.log('📍 Location services enabled:', locationEnabled);
+
+      // Try to get current position with debug info
+      Geolocation.getCurrentPosition(
+        (position) => {
+          console.log('✅ Debug location success:', position);
+        
+        },
+        (error) => {
+          console.error('❌ Debug location error:', error);
+         
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    } catch (error) {
+      console.error('❌ Debug error:', error);
+      Alert.alert('Debug Error', error.message);
+    }
+  };
+
+  
+
+  /**
+   * Initialize location tracking with improved error handling
+   */
+  const initializeLocationTracking = async () => {
+    try {
+      setLocationLoading(true);
+      setLocationStatus('loading');
+      console.log('🚀 Starting location tracking...');
+      
+      // Request permission
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        console.log('❌ Location permission denied');
+        setLocationStatus('error');
+        setLocationLoading(false);
+        return;
+      }
+
+      console.log('✅ Permission granted, getting location...');
+
+      // Try to get location with multiple fallback strategies
+      let coords = null;
+      let retryCount = 0;
+      const maxRetries = 2; // Reduced retries since we have fallbacks
+
+      while (!coords && retryCount < maxRetries) {
+        try {
+          console.log(`📍 Attempt ${retryCount + 1} to get location...`);
+          coords = await getExactLocation();
+          break;
+        } catch (error) {
+          retryCount++;
+          console.log(`❌ Location attempt ${retryCount} failed:`, error.message);
+          
+          if (retryCount < maxRetries) {
+            // Wait 1 second before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            // Try network-based location as last resort
+            try {
+              console.log('🌐 Trying network-based location...');
+              coords = await getNetworkLocation();
+              break;
+            } catch (networkError) {
+              console.error('❌ Network location also failed:', networkError);
+              throw error; // Throw original error
+            }
+          }
+        }
+      }
+
+      if (!coords) {
+        throw new Error('Failed to get location after multiple attempts');
+      }
+
+      console.log('📍 Final coordinates:', coords);
+
+      // Reverse geocode to get address
+      const resolvedAddress = await reverseGeocode(coords.latitude, coords.longitude);
+      console.log('📍 Resolved address:', resolvedAddress);
+
+      // Update UI and storage
+      setAddress(resolvedAddress);
+      await updateLocationInStorage(coords.latitude, coords.longitude, resolvedAddress);
+      setLocationStatus('success');
+
+      // Start continuous location monitoring
+      startLocationMonitoring();
+
+    } catch (error) {
+      console.error('❌ Location initialization error:', error);
+      setLocationStatus('error');
+      
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  /**
+   * Start continuous location monitoring with improved settings
+   */
+  const startLocationMonitoring = () => {
+    // Clear any existing watcher
+    if (watchIdRef.current !== null) {
+      Geolocation.clearWatch(watchIdRef.current);
+    }
+
+    const options = {
+      enableHighAccuracy: true,
+      distanceFilter: 5, // Update every 5 meters (reduced for better accuracy)
+      interval: 10000, // Update every 10 seconds
+      fastestInterval: 5000, // Fastest update every 5 seconds
+      forceRequestLocation: true,
+    };
+
+    console.log('🔄 Starting location monitoring...');
+
+    watchIdRef.current = Geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        console.log('🔴 Live location update:', latitude, longitude, 'Accuracy:', accuracy);
+
+        try {
+          const newAddress = await reverseGeocode(latitude, longitude);
+          setAddress(newAddress);
+          await updateLocationInStorage(latitude, longitude, newAddress);
+        } catch (error) {
+          console.error('❌ Live location update error:', error);
+        }
+      },
+      (error) => {
+        console.error('❌ Location watcher error:', error);
+        // Try to restart monitoring if there's an error
+        setTimeout(() => {
+          console.log('🔄 Restarting location monitoring...');
+          startLocationMonitoring();
+        }, 5000);
+      },
+      options
+    );
+  };
+
+  /**
+   * Load cached location from storage
+   */
+  const loadCachedLocation = async () => {
+    try {
+      const cachedLocation = await AsyncStorage.getItem('userLocation');
+      const cachedAddress = await AsyncStorage.getItem('address');
+      
+      if (cachedLocation) {
+        const location = JSON.parse(cachedLocation);
+        console.log('📱 Loaded cached location:', location);
+        
+        if (cachedAddress) {
+          setAddress(cachedAddress);
+          setLocationStatus('success');
+        } else if (location.latitude && location.longitude) {
+          // If we have coordinates but no address, try to geocode
+          const address = await reverseGeocode(location.latitude, location.longitude);
+          setAddress(address);
+          setLocationStatus('success');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading cached location:', error);
+      setLocationStatus('error');
+    }
+  };
 
   /**
    * Fetch promo banners from Firebase
@@ -68,10 +496,14 @@ const Home = ({ navigation, route }) => {
     try {
       const res = await axios.get(`${FIREBASE_DB_URL}/promos.json`);
       const data = res.data;
+
       if (data) {
         const promoArray = Object.keys(data).map(key => ({
           id: key,
-          ...data[key]
+          title1: data[key].title1 || '',
+          title2: data[key].title2 || '',
+          subtitle: data[key].subtitle || '',
+          bgColor: Array.isArray(data[key].bgColor) ? data[key].bgColor : ['#667eea', '#764ba2'],
         }));
         setPromos(promoArray);
       }
@@ -86,7 +518,7 @@ const Home = ({ navigation, route }) => {
   const fetchNotificationCount = async () => {
     try {
       const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`
+        `${FIREBASE_DB_URL}/users/${username}/notifications.json`
       );
       const data = res.data;
       if (data) {
@@ -140,8 +572,8 @@ const Home = ({ navigation, route }) => {
         const userData = userRes.data;
 
         if (userData) {
-          setProfileImage(userData.image || null); // image for header
-          setProfileData(userData); // full data for use (e.g. email, image, etc.)
+          setProfileImage(userData.image || null);
+          setProfileData(userData);
         }
       }
 
@@ -152,118 +584,43 @@ const Home = ({ navigation, route }) => {
   };
 
   /**
-   * Request location permission and watch live location for address updates
+   * Fetch latest offers and merge with food data
    */
+  const fetchLatestOffers = async () => {
+    try {
+      const offerRes = await axios.get(`${FIREBASE_DB_URL}/offers.json`);
+      const offerData = offerRes.data;
 
+      if (offerData) {
+        const offersArray = Object.keys(offerData).map(key => ({
+          id: key,
+          ...offerData[key],
+        }));
 
-  const reverseGeocodeAndUpdateFirebase = async (latitude, longitude) => {
-  try {
-    const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-      params: {
-        lat: latitude,
-        lon: longitude,
-        format: 'json',
-      },
-      headers: {
-        'User-Agent': 'ReactNativeApp/1.0',
-      },
-    });
+        // Merge offer with food details
+        const combinedData = await Promise.all(
+          offersArray.map(async offer => {
+            const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${offer.foodId}.json`);
+            const foodData = foodRes.data;
 
-    const resolvedAddress = response.data?.display_name || 'Unknown Address';
-    setAddress(resolvedAddress);
+            return {
+              id: offer.id,
+              name: foodData.name,
+              description: foodData.description || '',
+              image: foodData.image,
+              originalPrice: `₹${foodData.price}`,
+              discountedPrice: `₹${offer.offer}`,
+              offer: `₹${parseInt(foodData.price) - parseInt(offer.offer)} OFF`,
+            };
+          })
+        );
 
-    const storedUsername = await AsyncStorage.getItem('username');
-    if (storedUsername) {
-      await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
-        address: resolvedAddress,
-        latitude,
-        longitude,
-      });
-    }
-
-    await AsyncStorage.setItem('address', resolvedAddress);
-  } catch (error) {
-    console.log('❌ Reverse geocoding error:', error.message);
-  }
-};
-
-useEffect(() => {
-  const startLocationTracking = async () => {
-    const storedUsername = await AsyncStorage.getItem('username');
-    if (!storedUsername) {
-      console.log('⛔ Username not found');
-      return;
-    }
-
-    setUsername(storedUsername);
-
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-    );
-
-    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      // ✅ Use watchPosition for live updates
-      watchIdRef.current = Geolocation.watchPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          console.log('📍 Live location:', latitude, longitude);
-
-          try {
-            const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-              params: {
-                lat: latitude,
-                lon: longitude,
-                format: 'json',
-              },
-              headers: {
-                'User-Agent': 'ReactNativeApp/1.0',
-              },
-            });
-
-            const resolvedAddress = response.data?.display_name || 'Unknown Address';
-            console.log("📌 Address resolved:", resolvedAddress);
-
-            setAddress(resolvedAddress);
-
-            await axios.patch(`${FIREBASE_DB_URL}/users/${storedUsername}.json`, {
-              address: resolvedAddress,
-              latitude,
-              longitude,
-            });
-
-            await AsyncStorage.setItem('address', resolvedAddress);
-          } catch (error) {
-            console.log('❌ Reverse geocoding error:', error.message);
-          }
-        },
-        (error) => {
-          console.log('❌ watchPosition error:', error.message);
-        },
-        {
-          enableHighAccuracy: true,
-          distanceFilter: 10, // location update every 10 meters
-          interval: 10000,     // every 10 seconds
-          fastestInterval: 5000,
-        }
-      );
-    } else {
-      console.log('❌ Location permission denied');
+        setLatestOffers(combinedData);
+      }
+    } catch (err) {
+      console.log('❌ Error fetching latest offers:', err.message);
     }
   };
-
-  startLocationTracking();
-
-  // 🧹 Clean up watcher when component unmounts
-  return () => {
-    if (watchIdRef.current !== null) {
-      Geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-  };
-}, []);
-
-
-
 
   // Static food categories for horizontal scroll
   const foodItems = [
@@ -351,45 +708,6 @@ useEffect(() => {
   );
 
   /**
-   * Fetch latest offers and merge with food data
-   */
-  const fetchLatestOffers = async () => {
-    try {
-      const offerRes = await axios.get(`${FIREBASE_DB_URL}/offers.json`);
-      const offerData = offerRes.data;
-
-      if (offerData) {
-        const offersArray = Object.keys(offerData).map(key => ({
-          id: key,
-          ...offerData[key],
-        }));
-
-        // Merge offer with food details
-        const combinedData = await Promise.all(
-          offersArray.map(async offer => {
-            const foodRes = await axios.get(`${FIREBASE_DB_URL}/foods/${offer.foodId}.json`);
-            const foodData = foodRes.data;
-
-            return {
-              id: offer.id,
-              name: foodData.name,
-              description: foodData.description || '',
-              image: foodData.image,
-              originalPrice: `₹${foodData.price}`,
-              discountedPrice: `₹${offer.offer}`,
-              offer: `₹${parseInt(foodData.price) - parseInt(offer.offer)} OFF`,
-            };
-          })
-        );
-
-        setLatestOffers(combinedData);
-      }
-    } catch (err) {
-      console.log('❌ Error fetching latest offers:', err.message);
-    }
-  };
-
-  /**
    * Main effect: set greeting, load user/foods/offers/notifications/promos on focus
    */
   useEffect(() => {
@@ -404,13 +722,30 @@ useEffect(() => {
       fetchLatestOffers();
       fetchNotificationCount();
       fetchPromos();
+      
+      // Load cached location first, then try to get fresh location
+      loadCachedLocation().then(() => {
+        // Initialize location tracking after a short delay
+        setTimeout(() => {
+          initializeLocationTracking();
+        }, 1000);
+      });
     }
   }, [isFocused]);
+
+  // Cleanup location watcher on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        Geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
 
   // Main UI render
   return (
     <View style={styles.container}>
-
       <StatusBar backgroundColor="#667eea" barStyle="light-content" />
 
       {/* Loader Modal while loading */}
@@ -456,19 +791,34 @@ useEffect(() => {
                   </View>
                 </View>
               </View>
-              <View style={styles.headerActions}>
+                              <View style={styles.headerActions}>
                 <View style={styles.fixedWrapper}>
-                  <TouchableOpacity style={styles.locationBtn}>
-                    <EvilIcons name="location" size={20} color="#fff" />
+                  <TouchableOpacity 
+                    style={styles.locationBtn}
+                    onPress={initializeLocationTracking}
+                    disabled={locationLoading}
+                  >
+                    {locationLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <EvilIcons 
+                        name="location" 
+                        size={20} 
+                        color={locationStatus === 'success' ? '#4CAF50' : locationStatus === 'error' ? '#FF5722' : '#fff'} 
+                      />
+                    )}
                     <Text
                       style={styles.locationText}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      {address || 'Fetching address...'}
+                      {address || 'Tap to get location...'}
                     </Text>
+                   
                   </TouchableOpacity>
                 </View>
+                
+               
                 <TouchableOpacity
                   style={styles.notificationBtn}
                   onPress={() =>
@@ -503,29 +853,34 @@ useEffect(() => {
 
             {/* Promo Swiper */}
             <View style={styles.sliderContainer}>
-              <Swiper
-                autoplay
-                autoplayTimeout={2}
-                showsPagination={true}
-                dotColor="rgba(255,255,255,0.5)"
-                activeDotColor="#fff"
-                paginationStyle={{ bottom: 10, position: 'absolute' }}
-                style={{ height: 170 }}
-              >
-                {promos.map((item, index) => (
-                  <View key={index} style={styles.slideContainer}>
-                    <LinearGradient colors={item.bgColor} style={styles.promoCard}>
-                      <View style={styles.promoContent}>
-                        <View style={styles.promoTextContainer}>
-                          <Text style={styles.promoTitle}>{item.title1}</Text>
-                          <Text style={styles.promoSubtitle}>{item.title2}</Text>
-                          <Text style={styles.promoDesc}>{item.subtitle}</Text>
+              {promos.length > 0 && (
+                <Swiper
+                  autoplay
+                  autoplayTimeout={2}
+                  showsPagination={true}
+                  dotColor="rgba(255,255,255,0.5)"
+                  activeDotColor="#fff"
+                  paginationStyle={{ bottom: 10, position: 'absolute' }}
+                  style={{ height: 170 }}
+                >
+                  {promos.map((item, index) => (
+                    <View key={index} style={styles.slideContainer}>
+                      <LinearGradient
+                        colors={item.bgColor || ['#667eea', '#764ba2']}
+                        style={styles.promoCard}
+                      >
+                        <View style={styles.promoContent}>
+                          <View style={styles.promoTextContainer}>
+                            <Text style={styles.promoTitle}>{item.title1 || ''}</Text>
+                            <Text style={styles.promoSubtitle}>{item.title2 || ''}</Text>
+                            <Text style={styles.promoDesc}>{item.subtitle || ''}</Text>
+                          </View>
                         </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                ))}
-              </Swiper>
+                      </LinearGradient>
+                    </View>
+                  ))}
+                </Swiper>
+              )}
             </View>
 
             {/* Food Categories Horizontal List */}
@@ -564,6 +919,7 @@ useEffect(() => {
                 contentContainerStyle={styles.recipesList}
               />
             </View>
+
             {/* Latest Offers Horizontal List */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -580,17 +936,15 @@ useEffect(() => {
             </View>
           </ScrollView>
         </>
-
       )}
       <Chat />
-
     </View>
   );
 };
 
 export default Home;
 
-// ...styles remain unchanged...
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -656,11 +1010,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   fixedWrapper: {
-    width: 135, // 
+    width: 135,
     overflow: 'hidden',
     alignSelf: 'center',
   },
-
   locationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -670,12 +1023,39 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     width: '100%',
   },
-
   locationText: {
     color: '#fff',
     fontSize: 14,
     marginLeft: 3,
     flexShrink: 1,
+  },
+  refreshLocationBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 6,
+  },
+  debugBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 6,
+  },
+  locationStatusIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   notificationBtn: {
     position: 'relative',
@@ -735,13 +1115,11 @@ const styles = StyleSheet.create({
   },
   slideContainer: {
     paddingHorizontal: 20,
-
   },
   promoCard: {
     borderRadius: 20,
     height: 170,
     overflow: 'hidden',
-
   },
   promoContent: {
     flex: 1,
@@ -767,9 +1145,7 @@ const styles = StyleSheet.create({
   promoDesc: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
-
   },
-
   orderBtn: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
@@ -842,12 +1218,10 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginRight: 15,
     shadowColor: '#000',
-
     shadowOffset: {
       width: 0,
       height: 2,
     },
-
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
@@ -1005,30 +1379,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999,
   },
-
-  loaderBox: {
-    backgroundColor: '#fff',
-    padding: 30,
-    borderRadius: 16,
-    alignItems: 'center',
-    width: '80%',
-    elevation: 10,
-  },
-
-  loaderText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#334155',
-    textAlign: 'center',
-  },
-  loaderOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
   loaderBox: {
     backgroundColor: '#fff',
     padding: 30,
@@ -1044,6 +1394,4 @@ const styles = StyleSheet.create({
     color: '#334155',
     textAlign: 'center',
   },
-
-
 });

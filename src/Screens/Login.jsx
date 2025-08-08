@@ -12,6 +12,8 @@ import {
   ScrollView,
   StatusBar,
 } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
+
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import axios from 'axios';
@@ -84,7 +86,6 @@ const Login = ({ navigation }) => {
   // 🔐 Password validation
   if (!password.trim()) return showError('Password is required');
   if (password.length < 6) return showError('Password must be at least 6 characters');
-  if (!/[A-Z]/.test(password)) return showError('Password must contain at least one uppercase letter');
   if (!/[a-z]/.test(password)) return showError('Password must contain at least one lowercase letter');
   if (!/[0-9]/.test(password)) return showError('Password must contain at least one number');
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return showError('Password must contain at least one special character');
@@ -122,8 +123,17 @@ const Login = ({ navigation }) => {
     await AsyncStorage.setItem('username', username);
     await AsyncStorage.setItem('password', password);
 
-    navigation.replace('MainTabs', { username: username });
-
+navigation.dispatch(
+  CommonActions.reset({
+    index: 0,
+    routes: [
+      {
+        name: 'MainTabs',
+        params: { username: username },
+      },
+    ],
+  })
+);
   } catch (error) {
     showError('Signup failed. Try again.');
     console.log(error);
@@ -168,8 +178,17 @@ const Login = ({ navigation }) => {
         await AsyncStorage.setItem('password', password);
 
         // Navigate to main app
-        navigation.replace('MainTabs', { username: username });
-      }
+navigation.dispatch(
+  CommonActions.reset({
+    index: 0,
+    routes: [
+      {
+        name: 'MainTabs',
+        params: { username: username },
+      },
+    ],
+  })
+);      }
 
     } catch (error) {
       showError('Login failed');

@@ -44,7 +44,7 @@ const Welcome = ({ navigation }) => {
           </TouchableOpacity>
           {/* Divider for social sign in */}
           <Text style={styles.signInWith}>
-            ------------------ Sign in with ------------------
+            ------------ Sign in with ------------
           </Text>
           {/* Social login buttons (UI only) */}
           <View style={styles.socialButtonsContainer}>

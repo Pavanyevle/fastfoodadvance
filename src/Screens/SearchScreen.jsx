@@ -33,63 +33,29 @@ const [address, setAddress] = useState('');
   // Firebase foods endpoint
   const FIREBASE_URL = 'https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json';
 
-  const fetchFoods = async (search = '') => {
-  try {
-    let response;
-
-    if (search.trim() === '') {
-      response = await axios.get(FIREBASE_URL);  
-    } else {
-      response = await axios.get(FIREBASE_URL, {
-        params: {
-          orderBy: '"name"',
-          startAt: `"${search}"`,
-          endAt: `"${search}\uf8ff"`,
-        },
-      });
-    }
-
-    const data = response.data;
-
-    if (data) {
-      const foods = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key],
-      }));
-      setAllFoods(foods);
-    } else {
-      setAllFoods([]);
-    }
-  } catch (error) {
-    console.error('Error fetching foods:', error);
-  }
-};
-
-
-
-
-
-
-//  const fetchFoods = async (search = '') => {
+//   const fetchFoods = async (search = '') => {
 //   try {
-//     const response = await axios.get(FIREBASE_URL); // नेहमी पूर्ण डेटा घे
+//     let response;
+
+//     if (search.trim() === '') {
+//       response = await axios.get(FIREBASE_URL);  
+//     } else {
+//       response = await axios.get(FIREBASE_URL, {
+//         params: {
+//           orderBy: '"name"',
+//           startAt: `"${search}"`,
+//           endAt: `"${search}\uf8ff"`,
+//         },
+//       });
+//     }
 
 //     const data = response.data;
 
 //     if (data) {
-//       let foods = Object.keys(data).map(key => ({
+//       const foods = Object.keys(data).map(key => ({
 //         id: key,
 //         ...data[key],
 //       }));
-
-//       // जर search query आहे तर client-side filtering कर
-//       if (search.trim() !== '') {
-//         const lowerSearch = search.toLowerCase();
-//         foods = foods.filter(item =>
-//           item.name.toLowerCase().includes(lowerSearch)
-//         );
-//       }
-
 //       setAllFoods(foods);
 //     } else {
 //       setAllFoods([]);
@@ -98,6 +64,40 @@ const [address, setAddress] = useState('');
 //     console.error('Error fetching foods:', error);
 //   }
 // };
+
+
+
+
+
+
+ const fetchFoods = async (search = '') => {
+  try {
+    const response = await axios.get(FIREBASE_URL); // नेहमी पूर्ण डेटा घे
+
+    const data = response.data;
+
+    if (data) {
+      let foods = Object.keys(data).map(key => ({
+        id: key,
+        ...data[key],
+      }));
+
+      // जर search query आहे तर client-side filtering कर
+      if (search.trim() !== '') {
+        const lowerSearch = search.toLowerCase();
+        foods = foods.filter(item =>
+          item.name.toLowerCase().includes(lowerSearch)
+        );
+      }
+
+      setAllFoods(foods);
+    } else {
+      setAllFoods([]);
+    }
+  } catch (error) {
+    console.error('Error fetching foods:', error);
+  }
+};
 
 
   useEffect(() => {

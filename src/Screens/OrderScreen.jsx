@@ -149,6 +149,22 @@ const OrderScreen = ({ navigation, route }) => {
     }
   };
 
+  const fetchUserAddress = async (user) => {
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/users/${user}.json`);
+    if (res.data && res.data.location) {
+      const { latitude, longitude } = res.data.location;
+      const addressFromLocation = await reverseGeocodeFromLatLng(latitude, longitude);
+      setAddress(addressFromLocation); // Set to screen
+    } else if (res.data && res.data.address) {
+      setAddress(res.data.address);
+    }
+  } catch (err) {
+    console.error('Error fetching user address or location:', err);
+  }
+};
+
+
   /**
    * Update quantity for a cart item in Firebase and local state
    */
@@ -206,6 +222,13 @@ const OrderScreen = ({ navigation, route }) => {
       }
     }, [username]) // 👈 username बदलला तरही fetch होईल
   );
+
+
+  useEffect(() => {
+  if (username) {
+    fetchUserAddress(username); // ✅ username change झाला की चालेल
+  }
+}, [username]);
 
   /**
    * Fetch cart items, quantity, and address on mount
@@ -270,12 +293,12 @@ const OrderScreen = ({ navigation, route }) => {
     const fetchData = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
-        const storedAddress = await AsyncStorage.getItem('address');
 
         if (storedUsername) {
           setUsername(storedUsername);
           await fetchCartItems(storedUsername);
           await fetchQuantity(storedUsername);
+          await fetchUserAddress(storedUsername);
           await fetchUserAddress(storedUsername);
         }
         if (storedAddress) {
@@ -324,6 +347,22 @@ const OrderScreen = ({ navigation, route }) => {
     setItemToDelete(itemId);
     setDeleteModalVisible(true);
   };
+
+
+  const reverseGeocodeFromLatLng = async (lat, lon) => {
+  try {
+    const res = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+    );
+ const fullAddress = res.data.display_name; // ✅ येथे मिळाला full address
+    console.log("📍 Address from coordinates:", fullAddress);
+
+    // हवे असल्यास अजून वापरासाठी इथे वापरू शकतो
+    return fullAddress;  } catch (error) {
+    console.error("❌ Reverse geocoding failed:", error);
+    return "Unknown Location";
+  }
+};
 
   /**
    * Handle quantity change for a cart item (updates local and Firebase)
