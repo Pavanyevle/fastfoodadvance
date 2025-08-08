@@ -18,7 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // GROQ API key for AI assistant (replace with your own key in production)
-const GROQ_API_KEY = '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'; // Replace with your actual GROQ API key
+const GROQ_API_KEY = ''; // Replace with your actual GROQ API key
 
 /**
  * ChatBot screen
