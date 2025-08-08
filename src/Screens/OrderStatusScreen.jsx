@@ -97,13 +97,25 @@ const OrderStatusScreen = ({ navigation, route }) => {
       <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
 
       {/* Header with back button and title */}
-      <LinearGradient colors={['#1e293b', '#334155']} style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Status</Text>
-        <View style={styles.headerRight} />
-      </LinearGradient>
+     <LinearGradient colors={['#1e293b', '#334155']} style={styles.header}>
+  <TouchableOpacity
+    style={styles.backButton}
+    onPress={() => {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Home'); // fallback
+      }
+    }}
+  >
+    <Icon name="arrow-left" size={24} color="#fff" />
+  </TouchableOpacity>
+
+  <Text style={styles.headerTitle}>Order Status</Text>
+
+  <View style={{ width: 40 }} /> 
+</LinearGradient>
+
 
       {/* Welcome message with username */}
       <View style={styles.welcomeContainer}>
@@ -165,7 +177,7 @@ const OrderStatusScreen = ({ navigation, route }) => {
           {typeof currentStatus === 'string' && currentStatus.toLowerCase() === 'cancelled' ? (
             <Text style={[styles.estimateTime, { color: '#dc2626' }]}>❌ Cancelled</Text>
           ) : currentStatus?.toLowerCase() === 'delivered' ? (
-            <Text style={[styles.estimateTime, { color: '#16a34a' }]}>✅ Order Completed</Text>
+            <Text style={[styles.estimateTime, { color: '#16a34a' }]}>Order Completed</Text>
           ) : (
             <Text style={styles.estimateTime}>{deliveryTime}</Text>
           )}
@@ -190,8 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    
     elevation: 4,
   },
   backButton: {

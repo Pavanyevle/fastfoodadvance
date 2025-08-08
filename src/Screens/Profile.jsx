@@ -70,81 +70,71 @@ const ProfileScreen = ({ navigation, route }) => {
       console.error('Error loading user data from AsyncStorage:', error);
     }
   };
-   useEffect(() => {
-    let interval;
-    if (isFocused) {
-      loadUserData().then(() => {
-        if (username) {
-          fetchEmail(username);
-          fetchNotificationCount(username);
-          interval = setInterval(() => fetchNotificationCount(username), 1000);
-        }
-      });
-    }
-    return () => clearInterval(interval);
-  }, [isFocused, username]);
+  useEffect(() => {
+  let interval;
+  if (isFocused) {
+    loadUserData().then(() => {
+      if (username) {
+        fetchEmail(username);
+        fetchNotificationCount(username);
+        interval = setInterval(() => fetchNotificationCount(username), 1000);
+      }
+    });
+  }
+  return () => clearInterval(interval);
+}, [isFocused, username]);
+
   /**
    * Fetch user email and profile image from Firebase
    */
-  const fetchEmail = async () => {
-    try {
-      const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-      );
-      if (res.data) {
-        setDbEmail(res.data.email || 'No email');
-        setImageUrl(res.data.image || '');
-        setProfileData(res.data);
-      } else {
-        setDbEmail('No email found');
-        setImageUrl('');
-      }
-    } catch (err) {
-      console.log('Error fetching email/image:', err);
-      setDbEmail('Error fetching email');
+  const fetchEmail = async (uname) => {
+  try {
+    const res = await axios.get(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${uname}.json`
+    );
+    if (res.data) {
+      setDbEmail(res.data.email || 'No email');
+      setImageUrl(res.data.image || '');
+      setProfileData(res.data);
+    } else {
+      setDbEmail('No email found');
       setImageUrl('');
     }
-  };
+  } catch (err) {
+    console.log('Error fetching email/image:', err);
+    setDbEmail('Error fetching email');
+    setImageUrl('');
+  }
+};
 
-  /**
-   * Fetch unread notification count from Firebase
-   */
-  const fetchNotificationCount = async () => {
-    try {
-      const res = await axios.get(
-        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}/notifications.json`
+const fetchNotificationCount = async (uname) => {
+  try {
+    const res = await axios.get(
+      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${uname}/notifications.json`
+    );
+    const data = res.data;
+
+    if (data) {
+      const unreadNotifications = Object.values(data).filter(
+        n => typeof n.isRead !== 'undefined' && n.isRead === false
       );
-      const data = res.data;
+      const newCount = unreadNotifications.length;
 
-      if (data) {
-        const unreadNotifications = Object.values(data).filter(
-          n => typeof n.isRead !== 'undefined' && n.isRead === false
-        );
-        const count = unreadNotifications.length;
-        setNotificationCount(count);
-      } else {
+      // फक्त बदल झाला तरच state update कर
+      if (newCount !== notificationCount) {
+        setNotificationCount(newCount);
+      }
+    } else {
+      if (notificationCount !== 0) {
         setNotificationCount(0);
       }
-    } catch (err) {
-      console.error('❌ Error fetching notification count from DB:', err);
-      setNotificationCount(0);
     }
-  };
+  } catch (err) {
+    console.error('❌ Error fetching notification count from DB:', err);
+  }
+};
 
-  /**
-   * On focus: fetch profile info and poll notification count
-   */
-  useEffect(() => {
-    let interval;
-    if (isFocused) {
-      fetchEmail();
-      fetchNotificationCount();
-      interval = setInterval(fetchNotificationCount, 1000);
-    }
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isFocused]);
+ 
 
   /**
    * Handle user sign out

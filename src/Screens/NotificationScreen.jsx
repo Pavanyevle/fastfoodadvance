@@ -82,7 +82,7 @@ const NotificationScreen = ({ navigation, route }) => {
           ...data[key],
         }));
 
-        const sorted = parsed.sort((a, b) => new Date(b.time) - new Date(a.time));
+const sorted = parsed.sort((a, b) => new Date(a.time) - new Date(b.time)).reverse();
         setNotifications(sorted);
       } else {
         setNotifications([]);

@@ -723,6 +723,10 @@ const Home = ({ navigation, route }) => {
       fetchNotificationCount();
       fetchPromos();
       
+       const interval = setInterval(() => {
+    fetchNotificationCount();
+  }, 3000);
+
       // Load cached location first, then try to get fresh location
       loadCachedLocation().then(() => {
         // Initialize location tracking after a short delay

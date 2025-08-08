@@ -169,12 +169,13 @@ const PopularRecipesScreen = ({ navigation, route }) => {
  useEffect(() => {
   const fetchPopularRecipes = async () => {
     try {
-      const endpoint = title
-        ? `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/${title}.json`
-        : `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json`;
+      const endpoint = title 
+        ? `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/.json`
+        : `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods/.json`;
 
       const res = await axios.get(endpoint);
 
+console.log(res.data)
       if (res.data) {
         const recipeArray = Object.keys(res.data).map(key => ({
           id: key,
@@ -365,7 +366,7 @@ const filteredRecipes = popularRecipes.filter(item => {
       ) : (
         // Recipes grid
         <FlatList
-          data={filteredRecipes}
+          data={popularRecipes}
           renderItem={renderRecipeItem}
           keyExtractor={item => item.id}
           numColumns={2}
