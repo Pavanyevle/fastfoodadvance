@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
@@ -1002,7 +1002,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     overflow: 'hidden',
     margin: 20,
-    marginBottom: 40,
+    marginBottom: 5,
 
     shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },

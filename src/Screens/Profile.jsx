@@ -33,8 +33,6 @@ const ProfileScreen = ({ navigation, route }) => {
   const isFocused = useIsFocused();
 
   // Username and address from navigation params
-  const { username } = route.params;
-  const { address } = route.params;
 
   // State for profile image URL
   const [imageUrl, setImageUrl] = useState('');
@@ -50,10 +48,41 @@ const ProfileScreen = ({ navigation, route }) => {
   const [profileData, setProfileData] = useState({});
   // State for sign out confirmation modal
   const [modalVisible, setModalVisible] = useState(false);
+  const [username,setUsername]=useState('');
+    const [address,setAddress]=useState('');
+
+
 
   // User display name
   const name = username || 'User';
 
+
+
+
+   const loadUserData = async () => {
+    try {
+      const storedUsername = await AsyncStorage.getItem('username');
+      const storedAddress = await AsyncStorage.getItem('address');
+
+      if (storedUsername) setUsername(storedUsername);
+      if (storedAddress) setAddress(storedAddress);
+    } catch (error) {
+      console.error('Error loading user data from AsyncStorage:', error);
+    }
+  };
+   useEffect(() => {
+    let interval;
+    if (isFocused) {
+      loadUserData().then(() => {
+        if (username) {
+          fetchEmail(username);
+          fetchNotificationCount(username);
+          interval = setInterval(() => fetchNotificationCount(username), 1000);
+        }
+      });
+    }
+    return () => clearInterval(interval);
+  }, [isFocused, username]);
   /**
    * Fetch user email and profile image from Firebase
    */
@@ -296,7 +325,6 @@ const styles = StyleSheet.create({
   // 🔹 Container
   container: {
     flex: 1,
-    paddingBottom: 70,
     backgroundColor: '#f8f9fa',
   },
 

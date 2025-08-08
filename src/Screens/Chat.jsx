@@ -48,7 +48,7 @@ export default Chat;
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 110,
+    bottom:30,
     right: 10,
     zIndex: 999,
   },

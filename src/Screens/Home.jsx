@@ -948,7 +948,6 @@ export default Home;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 80,
     backgroundColor: '#f8f9fa',
   },
   header: {

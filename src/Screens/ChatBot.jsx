@@ -17,9 +17,18 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const GROQ_API_KEY = ''; 
+// GROQ API key for AI assistant (replace with your own key in production)
+const GROQ_API_KEY = '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'; // Replace with your actual GROQ API key
 
-
+/**
+ * ChatBot screen
+ * Provides a chat interface for users to interact with an AI assistant.
+ * Features:
+ * - Loads/saves chat history from Firebase
+ * - Fetches food menu and user orders for context
+ * - Sends user messages to AI API and displays responses
+ * - Shows typing indicator and handles loading states
+ */
 const ChatBot = ({ navigation }) => {
   // State for chat messages
   const [messages, setMessages] = useState([]);
@@ -385,32 +394,30 @@ Example:
         </View>
       </LinearGradient>
       {/* Show loader while loading chat history */}
-      {chatLoading ? (
-        <View style={styles.chatLoaderContainer}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={{ color: '#667eea', marginTop: 8 }}>Loading chat history...</Text>
+      <View style={styles.messageWrapper}>
+  {chatLoading ? (
+    <View style={styles.chatLoaderContainer}>
+      <ActivityIndicator size="large" color="#667eea" />
+    </View>
+  ) : (
+    <FlatList
+      ref={flatListRef}
+      data={messages}
+      renderItem={renderItem}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.messagesContainer}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={
+        <View style={styles.emptyChatContainer}>
+          <Ionicons name="chatbubble-ellipses-outline" size={60} color="#ccc" style={{ marginBottom: 10 }} />
+          <Text style={styles.emptyChatTitle}>No messages yet</Text>
+          <Text style={styles.emptyChatSubtitle}>Start the conversation by typing a message below!</Text>
         </View>
-      ) : (
-        <View style={styles.messageWrapper}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderItem}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.messagesContainer}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyChatContainer}>
-                <Ionicons name="chatbubble-ellipses-outline" size={60} color="#ccc" style={{ marginBottom: 10 }} />
-                <Text style={styles.emptyChatTitle}>No messages yet</Text>
-                <Text style={styles.emptyChatSubtitle}>Start the conversation by typing a message below!</Text>
-              </View>
-            }
-          />
+      }
+    />
+  )}
+</View>
 
-
-        </View>
-      )}
       {/* Input area for typing and sending messages */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
         <View style={styles.inputContainer}>
@@ -432,11 +439,9 @@ Example:
               style={[styles.sendButton, input.trim() === '' && styles.sendButtonDisabled]}
               disabled={loading || input.trim() === ''}
             >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
+            
                 <Ionicons name="send" size={20} color="#fff" />
-              )}
+             
             </TouchableOpacity>
           </View>
         </View>
@@ -702,5 +707,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  chatLoaderContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#f8f9fa',
+},
+chatLoaderText: {
+  color: '#667eea',
+  marginTop: 10,
+  fontSize: 16,
+  fontWeight: '500',
+},
+
 
 });
