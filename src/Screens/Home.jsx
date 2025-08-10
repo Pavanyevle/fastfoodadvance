@@ -56,7 +56,7 @@ const Home = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null); // Selected profile image
   const [profileData, setProfileData] = useState({}); // Full profile data
   const isFocused = useIsFocused(); // Navigation focus state
-  const [notificationCount, setNotificationCount] = useState(0); // Unread notifications
+  const [notificationCount, setNotificationCount] = useState(0);
   const [promos, setPromos] = useState([]); // Promo banners
   const [locationLoading, setLocationLoading] = useState(false); // Location loading state
   const [locationStatus, setLocationStatus] = useState('idle'); // idle, loading, success, error
@@ -86,7 +86,7 @@ const Home = ({ navigation, route }) => {
         // Check if location services are enabled first
         const locationEnabled = await checkLocationServices();
         if (!locationEnabled) {
-        
+
           return false;
         }
 
@@ -105,14 +105,14 @@ const Home = ({ navigation, route }) => {
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           return true;
         } else if (granted === PermissionsAndroid.RESULTS.DENIED) {
-         
+
           return false;
         } else {
           return false;
         }
       } catch (err) {
         console.warn('Permission request error:', err);
-     
+
         return false;
       }
     }
@@ -148,26 +148,26 @@ const Home = ({ navigation, route }) => {
             console.log('📍 Accuracy:', position.coords.accuracy, 'meters');
             console.log('📍 Timestamp:', new Date(position.timestamp).toLocaleString());
             console.log('📍 Using fallback:', isFallback);
-            
+
             // Check if accuracy is acceptable
             if (position.coords.accuracy > 100 && !isFallback) {
               console.warn('⚠️ Poor accuracy, trying fallback...');
               tryGetLocation(fallbackOptions, true);
               return;
             }
-            
+
             resolve(position.coords);
           },
           (error) => {
             console.error('❌ Location error:', error);
-            
+
             // If high accuracy failed, try fallback
             if (!isFallback) {
               console.log('🔄 Trying fallback location...');
               tryGetLocation(fallbackOptions, true);
               return;
             }
-            
+
             let errorMessage = 'Unable to get your location.';
             switch (error.code) {
               case error.PERMISSION_DENIED:
@@ -182,7 +182,7 @@ const Home = ({ navigation, route }) => {
               default:
                 errorMessage = 'Location error occurred. Please try again.';
             }
-            
+
             reject(new Error(errorMessage));
           },
           options
@@ -227,7 +227,7 @@ const Home = ({ navigation, route }) => {
   const reverseGeocode = async (latitude, longitude) => {
     try {
       console.log('🌍 Reverse geocoding for:', latitude, longitude);
-      
+
       // Try OpenStreetMap first
       const osmResponse = await axios.get(
         `https://nominatim.openstreetmap.org/reverse`,
@@ -270,7 +270,7 @@ const Home = ({ navigation, route }) => {
         await axios.patch(
           `${FIREBASE_DB_URL}/users/${username}.json`,
           {
-            address:address,
+            address: address,
             currentLocation: {
               latitude,
               longitude,
@@ -300,7 +300,7 @@ const Home = ({ navigation, route }) => {
   const debugLocationServices = async () => {
     try {
       console.log('🔍 Debugging location services...');
-      
+
       // Check if geolocation is available
       if (!Geolocation) {
         console.error('❌ Geolocation not available');
@@ -319,11 +319,11 @@ const Home = ({ navigation, route }) => {
       Geolocation.getCurrentPosition(
         (position) => {
           console.log('✅ Debug location success:', position);
-        
+
         },
         (error) => {
           console.error('❌ Debug location error:', error);
-         
+
         },
         {
           enableHighAccuracy: false,
@@ -337,7 +337,7 @@ const Home = ({ navigation, route }) => {
     }
   };
 
-  
+
 
   /**
    * Initialize location tracking with improved error handling
@@ -347,7 +347,7 @@ const Home = ({ navigation, route }) => {
       setLocationLoading(true);
       setLocationStatus('loading');
       console.log('🚀 Starting location tracking...');
-      
+
       // Request permission
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) {
@@ -372,7 +372,7 @@ const Home = ({ navigation, route }) => {
         } catch (error) {
           retryCount++;
           console.log(`❌ Location attempt ${retryCount} failed:`, error.message);
-          
+
           if (retryCount < maxRetries) {
             // Wait 1 second before retry
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -411,7 +411,7 @@ const Home = ({ navigation, route }) => {
     } catch (error) {
       console.error('❌ Location initialization error:', error);
       setLocationStatus('error');
-      
+
     } finally {
       setLocationLoading(false);
     }
@@ -468,11 +468,11 @@ const Home = ({ navigation, route }) => {
     try {
       const cachedLocation = await AsyncStorage.getItem('userLocation');
       const cachedAddress = await AsyncStorage.getItem('address');
-      
+
       if (cachedLocation) {
         const location = JSON.parse(cachedLocation);
         console.log('📱 Loaded cached location:', location);
-        
+
         if (cachedAddress) {
           setAddress(cachedAddress);
           setLocationStatus('success');
@@ -523,7 +523,7 @@ const Home = ({ navigation, route }) => {
       const data = res.data;
       if (data) {
         const unread = Object.values(data).filter(n => n.isRead === false);
-        setNotificationCount(unread.length);
+        setNotificationCount(prevCount => prevCount + 1);
       } else {
         setNotificationCount(0);
       }
@@ -710,6 +710,8 @@ const Home = ({ navigation, route }) => {
   /**
    * Main effect: set greeting, load user/foods/offers/notifications/promos on focus
    */
+
+
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good Morning !');
@@ -717,25 +719,22 @@ const Home = ({ navigation, route }) => {
     else setGreeting('Good Evening !');
 
     if (isFocused) {
-      loadUserData();
-      fetchFoods();
-      fetchLatestOffers();
-      fetchNotificationCount();
-      fetchPromos();
-      
-       const interval = setInterval(() => {
-    fetchNotificationCount();
-  }, 3000);
+      Promise.all([
+        loadUserData(),
+        fetchFoods(),
+        fetchLatestOffers(),
+        fetchNotificationCount(),
+        fetchPromos()
+      ]).finally(() => setLoading(false));
 
-      // Load cached location first, then try to get fresh location
       loadCachedLocation().then(() => {
-        // Initialize location tracking after a short delay
         setTimeout(() => {
           initializeLocationTracking();
         }, 1000);
       });
     }
   }, [isFocused]);
+
 
   // Cleanup location watcher on unmount
   useEffect(() => {
@@ -795,9 +794,9 @@ const Home = ({ navigation, route }) => {
                   </View>
                 </View>
               </View>
-                              <View style={styles.headerActions}>
+              <View style={styles.headerActions}>
                 <View style={styles.fixedWrapper}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.locationBtn}
                     onPress={initializeLocationTracking}
                     disabled={locationLoading}
@@ -805,10 +804,10 @@ const Home = ({ navigation, route }) => {
                     {locationLoading ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <EvilIcons 
-                        name="location" 
-                        size={20} 
-                        color={locationStatus === 'success' ? '#4CAF50' : locationStatus === 'error' ? '#FF5722' : '#fff'} 
+                      <EvilIcons
+                        name="location"
+                        size={20}
+                        color={locationStatus === 'success' ? '#4CAF50' : locationStatus === 'error' ? '#FF5722' : '#fff'}
                       />
                     )}
                     <Text
@@ -818,11 +817,11 @@ const Home = ({ navigation, route }) => {
                     >
                       {address || 'Tap to get location...'}
                     </Text>
-                   
+
                   </TouchableOpacity>
                 </View>
-                
-               
+
+
                 <TouchableOpacity
                   style={styles.notificationBtn}
                   onPress={() =>
@@ -831,7 +830,7 @@ const Home = ({ navigation, route }) => {
                 >
                   <Ionicons name="notifications-outline" size={24} color="#fff" />
                   {notificationCount > 0 && (
-                    <View style={styles.notificationBadge}>
+                    <View style={styles.badge}>
                       <Text style={styles.badgeText}>{notificationCount}</Text>
                     </View>
                   )}
@@ -1078,9 +1077,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -3,
+    backgroundColor: 'red',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   badgeText: {
-    color: '#fff',
-    fontSize: 12,
+    color: 'white',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   content: {

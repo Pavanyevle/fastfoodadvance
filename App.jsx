@@ -30,6 +30,8 @@ import AboutScreen from './src/Screens/AboutScreen';
 import ReferScreen from './src/Screens/ReferScreen';
 import HelpSupportScreen from './src/Screens/HelpSupportScreen';
 import MainTabNavigator from './src/Navigators/MainTabNavigator';
+import AddressSelection from './src/Screens/AddressSelection';
+import OrderTrackingScreen from './src/Screens/OrderTrackingScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -204,6 +206,8 @@ const App = () => {
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
         <Stack.Screen name="Chat" component={Chat} />
         <Stack.Screen name="HelpSupportScreen" component={HelpSupportScreen} />
+        <Stack.Screen name="AddressSelection" component={AddressSelection} />
+        <Stack.Screen name="OrderTrackingScreen" component={OrderTrackingScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>

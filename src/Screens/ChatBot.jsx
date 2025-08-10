@@ -67,29 +67,29 @@ const ChatBot = ({ navigation }) => {
    * Returns a formatted string list of available foods
    */
   const fetchFoodItems = async () => {
-  try {
-    const res = await axios.get('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json');
-    const data = res.data;
-    if (data) {
-      const foodList = Object.entries(data)
-        .filter(([id, item]) => item.available)
-        .map(([id, item]) => `• [${id}] ${item.name} (${item.category})`);
+    try {
+      const res = await axios.get('https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/foods.json');
+      const data = res.data;
+      if (data) {
+        const foodList = Object.entries(data)
+          .filter(([id, item]) => item.available)
+          .map(([id, item]) => `• [${id}] ${item.name} (${item.category})`);
 
-      const finalList = foodList.join('\n');
-      
-      // ✅ DEBUGGING LOG:
-      console.log('🍔 Food items sent to AI:\n', finalList);
+        const finalList = foodList.join('\n');
 
-      return finalList;
-    } else {
-      console.log('⚠️ No food items found in database.');
-      return "No food items are currently available.";
+        // ✅ DEBUGGING LOG:
+        console.log('🍔 Food items sent to AI:\n', finalList);
+
+        return finalList;
+      } else {
+        console.log('⚠️ No food items found in database.');
+        return "No food items are currently available.";
+      }
+    } catch (error) {
+      console.error("❌ Error fetching food items:", error);
+      return "Error fetching food items.";
     }
-  } catch (error) {
-    console.error("❌ Error fetching food items:", error);
-    return "Error fetching food items.";
-  }
-};
+  };
 
 
 
@@ -117,7 +117,7 @@ const ChatBot = ({ navigation }) => {
    * On mount: fetch chat history from Firebase
    */
   useEffect(() => {
-    if (!username) return; 
+    if (!username) return;
 
     const fetchChatHistory = async () => {
       try {
@@ -172,9 +172,18 @@ const ChatBot = ({ navigation }) => {
       const res = await axios.get(`https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${userKey}/orders.json`);
       const data = res.data;
       if (data) {
-        const orders = Object.values(data)
-          .map(order => `• ${order.name} (Qty: ${order.quantity}, Status: ${order.status}, Price: ${order.price}, OrderTime: ${order.orderTime}, Status: ${order.status}, Address: ${order.address}, totalAmount: ${order.totalAmount})`);
-        return orders.join('\n');
+
+        const convertToIST = (utcDateStr) => {
+          const date = new Date(utcDateStr);
+          // IST = UTC + 5:30
+          const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+          return istDate.toLocaleString('en-IN', { hour12: false });
+        };
+        const orders = Object.values(data).map(order => {
+          const istOrderTime = convertToIST(order.orderTime);
+          return `• ${order.name} (Qty: ${order.quantity}, Status: ${order.status}, Price: ${order.price}, OrderTime: ${istOrderTime}, Address: ${order.address}, TotalAmount: ${order.totalAmount})`;
+        });
+
       } else {
         return "No orders placed yet.";
       }
@@ -230,7 +239,7 @@ const ChatBot = ({ navigation }) => {
           messages: [
             {
               role: 'system',
-             content: `You are *ChatBot*, a smart, polite, and friendly virtual assistant for a food delivery app. and responce any language live English,Marathi,Hindi. Not mixing any language one time responce.
+              content: `You are *ChatBot*,created by pavan, a smart, polite, and friendly virtual assistant for a food delivery app. and responce any language live English,Marathi,Hindi. Not mixing any language one time responce.
 
 👤 User: ${username}
 
@@ -395,28 +404,28 @@ Example:
       </LinearGradient>
       {/* Show loader while loading chat history */}
       <View style={styles.messageWrapper}>
-  {chatLoading ? (
-    <View style={styles.chatLoaderContainer}>
-      <ActivityIndicator size="large" color="#667eea" />
-    </View>
-  ) : (
-    <FlatList
-      ref={flatListRef}
-      data={messages}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styles.messagesContainer}
-      showsVerticalScrollIndicator={false}
-      ListEmptyComponent={
-        <View style={styles.emptyChatContainer}>
-          <Ionicons name="chatbubble-ellipses-outline" size={60} color="#ccc" style={{ marginBottom: 10 }} />
-          <Text style={styles.emptyChatTitle}>No messages yet</Text>
-          <Text style={styles.emptyChatSubtitle}>Start the conversation by typing a message below!</Text>
-        </View>
-      }
-    />
-  )}
-</View>
+        {chatLoading ? (
+          <View style={styles.chatLoaderContainer}>
+            <ActivityIndicator size="large" color="#667eea" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyChatContainer}>
+                <Ionicons name="chatbubble-ellipses-outline" size={60} color="#ccc" style={{ marginBottom: 10 }} />
+                <Text style={styles.emptyChatTitle}>No messages yet</Text>
+                <Text style={styles.emptyChatSubtitle}>Start the conversation by typing a message below!</Text>
+              </View>
+            }
+          />
+        )}
+      </View>
 
       {/* Input area for typing and sending messages */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
@@ -439,9 +448,9 @@ Example:
               style={[styles.sendButton, input.trim() === '' && styles.sendButtonDisabled]}
               disabled={loading || input.trim() === ''}
             >
-            
-                <Ionicons name="send" size={20} color="#fff" />
-             
+
+              <Ionicons name="send" size={20} color="#fff" />
+
             </TouchableOpacity>
           </View>
         </View>
@@ -708,17 +717,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   chatLoaderContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: '#f8f9fa',
-},
-chatLoaderText: {
-  color: '#667eea',
-  marginTop: 10,
-  fontSize: 16,
-  fontWeight: '500',
-},
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  chatLoaderText: {
+    color: '#667eea',
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+  },
 
 
 });

@@ -485,7 +485,7 @@ const OrderScreen = ({ navigation, route }) => {
       // Simulate API delay before navigating to payment
       setTimeout(() => {
         setIsPlacingOrder(false);
-        navigation.navigate('PaymentScreen', {
+        navigation.navigate('AddressSelection', {
           totalItems: cartItems.length,
           totalPrice: total,
           itemIds: itemIds,

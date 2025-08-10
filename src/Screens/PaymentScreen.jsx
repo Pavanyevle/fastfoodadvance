@@ -9,7 +9,8 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
-  Modal, ActivityIndicator
+  Modal, ActivityIndicator,
+  ToastAndroid
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -130,6 +131,11 @@ const PaymentScreen = ({ navigation, route }) => {
         index: 0,
         routes: [{ name: 'MainTabs', params: { orderId: itemIds, username } }],
       });
+      ToastAndroid.showWithGravity(
+  'Order Placed!',
+  ToastAndroid.SHORT,
+  ToastAndroid.BOTTOM
+);
 
 
     } catch (err) {

@@ -265,25 +265,34 @@ const OrderHistoryScreen = ({ navigation, route }) => {
               <Text>Date: {new Date(selectedOrder.orderTime).toLocaleString()}</Text>
               <Text style={{ marginTop: 4 }}>Address: {selectedOrder.address}</Text>
             </ScrollView>
+            {/* Buttons Row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+              {/* Close button */}
+              <TouchableOpacity
+                onPress={() => setSelectedOrder(null)}
+                style={[styles.closeBtn, { flex: 1, marginRight: 5 }]}
+              >
+                <Text style={{ color: '#fff', textAlign: 'center' }}>Close</Text>
+              </TouchableOpacity>
 
-            {/* Close button for modal */}
-            <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.closeBtn}>
-              <Text style={{ color: '#fff' }}>Close</Text>
-            </TouchableOpacity>
+              {/* Track order button */}
+              {selectedOrder?.status !== 'cancelled' && selectedOrder?.status !== 'delivered' && (
+                <TouchableOpacity
+                  style={[styles.trackBtn, { flex: 1, marginLeft: 5 }]}
+                  onPress={() => {
+                    navigation.navigate('OrderTrackingScreen', {
+                      order: selectedOrder,
+                      username,
+                      address: selectedOrder.address,
+                    });
+                    setSelectedOrder(null);
+                  }}
+                >
+                  <Text style={{ color: '#fff', textAlign: 'center' }}>Track Order</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {/* Track order button */}
-            <TouchableOpacity
-              style={styles.trackBtn}
-              onPress={() => {
-                navigation.navigate('OrderStatusScreen', {
-                  order: selectedOrder,
-                  username,
-                  address: selectedOrder.address,
-                });
-                setSelectedOrder(null);
-              }}>
-              <Text style={{ color: '#fff' }}>Track Order</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -418,7 +427,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   closeBtn: {
-    marginTop: 16,
+    marginTop: 10,
     backgroundColor: '#6366f1',
     padding: 12,
     borderRadius: 8,

@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
   StatusBar,
+  ToastAndroid,
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 
@@ -61,90 +62,96 @@ const Login = ({ navigation }) => {
    */
 
   const generateReferralCode = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'FAST';
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-};
-
- const handleSignUp = async () => {
-  setErrorMsg('');
-
-  // 🔐 Username validation
-  if (!username.trim()) return showError('Username is required');
-  if (username.length < 3) return showError('Username must be at least 3 characters');
-  if (/\s/.test(username)) return showError('Username should not contain spaces');
-  if (/[^a-zA-Z0-9]/.test(username)) return showError('Username should not contain special characters');
-
-  // 🔐 Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email.trim()) return showError('Email is required');
-  if (!emailRegex.test(email)) return showError('Invalid email format');
-
-  // 🔐 Password validation
-  if (!password.trim()) return showError('Password is required');
-  if (password.length < 6) return showError('Password must be at least 6 characters');
-  if (!/[a-z]/.test(password)) return showError('Password must contain at least one lowercase letter');
-  if (!/[0-9]/.test(password)) return showError('Password must contain at least one number');
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return showError('Password must contain at least one special character');
-
-  // 🔐 Confirm password validation
-  if (!confirmPassword.trim()) return showError('Please confirm your password');
-  if (password !== confirmPassword) return showError('Passwords do not match');
-
-  // 🔄 Continue sign-up process
-  setLoadingSignup(true);
-
-  try {
-    const userExists = await axios.get(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-    );
-
-    if (userExists.data) {
-      showError('Username already exists');
-      setLoadingSignup(false);
-      return;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = 'FAST';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    return code;
+  };
 
-    const referralCode = generateReferralCode();
+  const handleSignUp = async () => {
+    setErrorMsg('');
 
-    await axios.put(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-      {
-        email: email.trim(),
-        password,
-        address: '.....',
-        referralCode: referralCode,
+    // 🔐 Username validation
+    if (!username.trim()) return showError('Username is required');
+    if (username.length < 3) return showError('Username must be at least 3 characters');
+    if (/\s/.test(username)) return showError('Username should not contain spaces');
+    if (/[^a-zA-Z0-9]/.test(username)) return showError('Username should not contain special characters');
+
+    // 🔐 Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) return showError('Email is required');
+    if (!emailRegex.test(email)) return showError('Invalid email format');
+
+    // 🔐 Password validation
+    if (!password.trim()) return showError('Password is required');
+    if (password.length < 6) return showError('Password must be at least 6 characters');
+    if (!/[a-z]/.test(password)) return showError('Password must contain at least one lowercase letter');
+    if (!/[0-9]/.test(password)) return showError('Password must contain at least one number');
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return showError('Password must contain at least one special character');
+
+    // 🔐 Confirm password validation
+    if (!confirmPassword.trim()) return showError('Please confirm your password');
+    if (password !== confirmPassword) return showError('Passwords do not match');
+
+    // 🔄 Continue sign-up process
+    setLoadingSignup(true);
+
+    try {
+      const userExists = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+      );
+
+      if (userExists.data) {
+        showError('Username already exists');
+        setLoadingSignup(false);
+        return;
       }
-    );
 
-    await AsyncStorage.setItem('username', username);
-    await AsyncStorage.setItem('password', password);
+      const referralCode = generateReferralCode();
 
-navigation.dispatch(
-  CommonActions.reset({
-    index: 0,
-    routes: [
-      {
-        name: 'MainTabs',
-        params: { username: username },
-      },
-    ],
-  })
+      await axios.put(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
+        {
+          email: email.trim(),
+          password,
+          address: '.....',
+          referralCode: referralCode,
+        }
+      );
+
+      await AsyncStorage.setItem('username', username);
+      await AsyncStorage.setItem('password', password);
+
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'MainTabs',
+              params: { username: username },
+            },
+          ],
+        })
+      );
+ ToastAndroid.showWithGravity(
+  'Account created successfully!',
+  ToastAndroid.SHORT,
+  ToastAndroid.BOTTOM
 );
-  } catch (error) {
-    showError('Signup failed. Try again.');
-    console.log(error);
-  } finally {
-    setLoadingSignup(false);
-    setUsername('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-  }
-};
+    } catch (error) {
+      showError('Signup failed. Try again.');
+      console.log(error);
+    } finally {
+      setLoadingSignup(false);
+      setUsername('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+    }
+  };
 
 
   /**
@@ -156,6 +163,9 @@ navigation.dispatch(
    * - Navigates to MainTabs on success
    */
   const handleLogin = async () => {
+
+
+   
     setErrorMsg('');
 
     if (!username || !password)
@@ -178,17 +188,24 @@ navigation.dispatch(
         await AsyncStorage.setItem('password', password);
 
         // Navigate to main app
-navigation.dispatch(
-  CommonActions.reset({
-    index: 0,
-    routes: [
-      {
-        name: 'MainTabs',
-        params: { username: username },
-      },
-    ],
-  })
-);      }
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'MainTabs',
+                params: { username: username },
+              },
+            ],
+          })
+        );
+      }
+       ToastAndroid.showWithGravity(
+  'Login successful!',
+  ToastAndroid.SHORT,
+  ToastAndroid.BOTTOM
+);
+
 
     } catch (error) {
       showError('Login failed');
@@ -225,112 +242,112 @@ navigation.dispatch(
   return (
 
 
-   <KeyboardAvoidingView
-    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    style={{ flex: 1 }}
-  >
-    <TouchableWithoutFeedback >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, backgroundColor: '#ffffff', minHeight: height,  }}
-        keyboardShouldPersistTaps="handled"
-      >
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D2B" />
-      {/* Header section with title and subtitle */}
-      <View style={styles.headerSection}>
-        <Text style={styles.title}>Welcome to FastFood</Text>
-        <Text style={styles.subtitle}>
-          {isLogin ? 'Sign in to continue your journey' : 'Create your account to get started'}
-        </Text>
-      </View>
-
-      {/* Main form container */}
-      <View style={styles.formContainer}>
-        {/* Tabs for switching between Sign In and Sign Up */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity style={[styles.tabButton, isLogin && styles.activeTabButton]} onPress={() => setIsLogin(true)}>
-            <Text style={[styles.tabText, isLogin && styles.activeTabText]}>Sign In</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tabButton, !isLogin && styles.activeTabButton]} onPress={() => setIsLogin(false)}>
-            <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Form fields for login/signup */}
-        <View style={styles.formFields}>
-          {renderInput('person-outline', 'Username', username, setUsername)}
-          {!isLogin && renderInput('mail-outline', 'Email address', email, setEmail)}
-          {renderInput('lock-closed-outline', 'Password', password, setPassword, true, () => setShowPassword(!showPassword), showPassword)}
-          {!isLogin && renderInput('lock-closed-outline', 'Confirm password', confirmPassword, setConfirmPassword, true, () => setShowConfirmPassword(!showConfirmPassword), showConfirmPassword)}
-
-          {/* Error message display */}
-          {errorMsg.length > 0 && <Text style={{ color: 'red', marginBottom: 10 }}>{errorMsg}</Text>}
-
-          {/* Remember me and forgot password (login only) */}
-          {isLogin && (
-            <View style={styles.rememberForgotRow}>
-              <TouchableOpacity style={styles.rememberContainer} onPress={() => setRemember(!remember)}>
-                <View style={[styles.checkbox, remember && styles.checkedBox]}>
-                  {remember && <Ionicons name="checkmark" size={14} color="#fff" />}
-                </View>
-                <Text style={styles.rememberText}>Remember me</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('Forgot')}>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </TouchableOpacity>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, backgroundColor: '#ffffff', minHeight: height, }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="#0D0D2B" />
+            {/* Header section with title and subtitle */}
+            <View style={styles.headerSection}>
+              <Text style={styles.title}>Welcome to FastFood</Text>
+              <Text style={styles.subtitle}>
+                {isLogin ? 'Sign in to continue your journey' : 'Create your account to get started'}
+              </Text>
             </View>
-          )}
 
-          {/* Submit button for login/signup */}
-          <TouchableOpacity
-            style={[styles.submitButton, (loadingLogin || loadingSignup) && styles.disabledButton]}
-            onPress={isLogin ? handleLogin : handleSignUp}
-            disabled={loadingLogin || loadingSignup}
-          >
-            {(loadingLogin || loadingSignup) ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+            {/* Main form container */}
+            <View style={styles.formContainer}>
+              {/* Tabs for switching between Sign In and Sign Up */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity style={[styles.tabButton, isLogin && styles.activeTabButton]} onPress={() => setIsLogin(true)}>
+                  <Text style={[styles.tabText, isLogin && styles.activeTabText]}>Sign In</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.tabButton, !isLogin && styles.activeTabButton]} onPress={() => setIsLogin(false)}>
+                  <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Form fields for login/signup */}
+              <View style={styles.formFields}>
+                {renderInput('person-outline', 'Username', username, setUsername)}
+                {!isLogin && renderInput('mail-outline', 'Email address', email, setEmail)}
+                {renderInput('lock-closed-outline', 'Password', password, setPassword, true, () => setShowPassword(!showPassword), showPassword)}
+                {!isLogin && renderInput('lock-closed-outline', 'Confirm password', confirmPassword, setConfirmPassword, true, () => setShowConfirmPassword(!showConfirmPassword), showConfirmPassword)}
+
+                {/* Error message display */}
+                {errorMsg.length > 0 && <Text style={{ color: 'red', marginBottom: 10 }}>{errorMsg}</Text>}
+
+                {/* Remember me and forgot password (login only) */}
+                {isLogin && (
+                  <View style={styles.rememberForgotRow}>
+                    <TouchableOpacity style={styles.rememberContainer} onPress={() => setRemember(!remember)}>
+                      <View style={[styles.checkbox, remember && styles.checkedBox]}>
+                        {remember && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <Text style={styles.rememberText}>Remember me</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('Forgot')}>
+                      <Text style={styles.forgotText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Submit button for login/signup */}
+                <TouchableOpacity
+                  style={[styles.submitButton, (loadingLogin || loadingSignup) && styles.disabledButton]}
+                  onPress={isLogin ? handleLogin : handleSignUp}
+                  disabled={loadingLogin || loadingSignup}
+                >
+                  {(loadingLogin || loadingSignup) ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Divider and social login buttons (UI only) */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or continue with</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.socialButtonsContainer}>
+                <TouchableOpacity style={styles.socialButton}>
+                  <FontAwesome name="google" size={20} color="#EA4335" />
+                  <Text style={styles.socialButtonText}>Google</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.socialButton}>
+                  <FontAwesome name="facebook" size={20} color="#4267B2" />
+                  <Text style={styles.socialButtonText}>Facebook</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.socialButton}>
+                  <FontAwesome name="apple" size={20} color="#000" />
+                  <Text style={styles.socialButtonText}>Apple</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Loading overlay while authenticating */}
+            {(loadingLogin || loadingSignup) && (
+              <View style={styles.loadingOverlay}>
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#FF6F00" />
+                  <Text style={styles.loadingText}>Please wait...</Text>
+                </View>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Divider and social login buttons (UI only) */}
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.socialButtonsContainer}>
-          <TouchableOpacity style={styles.socialButton}>
-            <FontAwesome name="google" size={20} color="#EA4335" />
-            <Text style={styles.socialButtonText}>Google</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
-            <FontAwesome name="facebook" size={20} color="#4267B2" />
-            <Text style={styles.socialButtonText}>Facebook</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
-            <FontAwesome name="apple" size={20} color="#000" />
-            <Text style={styles.socialButtonText}>Apple</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Loading overlay while authenticating */}
-      {(loadingLogin || loadingSignup) && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6F00" />
-            <Text style={styles.loadingText}>Please wait...</Text>
           </View>
-        </View>
-      )}
-    </View>
-       </ScrollView>
-    </TouchableWithoutFeedback>
-  </KeyboardAvoidingView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 

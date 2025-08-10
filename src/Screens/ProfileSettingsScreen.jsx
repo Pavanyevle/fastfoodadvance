@@ -12,6 +12,7 @@ import {
   Switch,
   ActivityIndicator,
   Image,
+  ToastAndroid,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -111,11 +112,13 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
   // Open delete account modal
   const handleDeleteAccount = () => {
     setDeleteModal(true);
+
   };
 
   // Open logout modal
   const handleLogout = () => {
     setLogoutModal(true);
+
   };
 
   // Pick image from gallery for profile picture
@@ -153,10 +156,15 @@ const ProfileSettingsScreen = ({ navigation, route }) => {
       setTimeout(() => {
         AsyncStorage.removeItem('username');
         AsyncStorage.removeItem('address');
-navigation.reset({
-  index: 0,
-  routes: [{ name: 'Welcome' }],
-});
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Welcome' }],
+        });
+        ToastAndroid.showWithGravity(
+          'Account Deleted successful!',
+          ToastAndroid.SHORT,
+          ToastAndroid.BOTTOM
+        );
       }, 1500);
 
     } catch (error) {
@@ -179,80 +187,80 @@ navigation.reset({
   };
 
   // Change password logic
- const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+  const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
 
-const handleChangePassword = async () => {
-  setPasswordError('');
-  setLoading(true);
-
-  try {
-    // 🔹 1. Firebase वरून user data घ्या
-    const res = await axios.get(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
-    );
-
-    const userData = res.data;
-
-    // 🔹 2. current password verify करा
-    if (!userData || userData.password !== currentPassword) {
-      setPasswordError('Current password is incorrect');
-      setLoading(false);
-      return;
-    }
-
-    // 🔹 3. बाकी validations
-    if (!newPassword || !confirmPassword) {
-      setPasswordError('Please enter new and confirm password');
-      setLoading(false);
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
-
-    // 🔹 4. Strong password check (at least 1 uppercase, lowercase, digit, special char)
-    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
-    if (!strongPasswordRegex.test(newPassword)) {
-      setPasswordError('Password must include uppercase, lowercase, number, and special character');
-      setLoading(false);
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
-    // 🔹 5. Password update in Firebase
-    await axios.patch(
-      `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
-      { password: newPassword }
-    );
-
-    // 🔹 6. Reset state
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+  const handleChangePassword = async () => {
     setPasswordError('');
-    setPasswordModal(false);
-    setLoading(false);
+    setLoading(true);
 
-    setMessageModal({
-      visible: true,
-      type: 'success',
-      message: 'Password updated successfully!',
-    });
+    try {
+      // 🔹 1. Firebase वरून user data घ्या
+      const res = await axios.get(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`
+      );
 
-  } catch (error) {
-    console.error('Password change error:', error);
-    setPasswordError('Something went wrong');
-    setLoading(false);
-  }
-};
+      const userData = res.data;
+
+      // 🔹 2. current password verify करा
+      if (!userData || userData.password !== currentPassword) {
+        setPasswordError('Current password is incorrect');
+        setLoading(false);
+        return;
+      }
+
+      // 🔹 3. बाकी validations
+      if (!newPassword || !confirmPassword) {
+        setPasswordError('Please enter new and confirm password');
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        setPasswordError('Password must be at least 6 characters');
+        setLoading(false);
+        return;
+      }
+
+      // 🔹 4. Strong password check (at least 1 uppercase, lowercase, digit, special char)
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+      if (!strongPasswordRegex.test(newPassword)) {
+        setPasswordError('Password must include uppercase, lowercase, number, and special character');
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
+
+      // 🔹 5. Password update in Firebase
+      await axios.patch(
+        `https://fooddeliveryapp-395e7-default-rtdb.firebaseio.com/users/${username}.json`,
+        { password: newPassword }
+      );
+
+      // 🔹 6. Reset state
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
+      setPasswordModal(false);
+      setLoading(false);
+
+     
+ToastAndroid.showWithGravity(
+  'Password updated successfully!',
+  ToastAndroid.SHORT,
+  ToastAndroid.BOTTOM
+);
+    } catch (error) {
+      console.error('Password change error:', error);
+      setPasswordError('Something went wrong');
+      setLoading(false);
+    }
+  };
 
   // Save profile changes to DB
   const handleSave = async () => {
@@ -282,7 +290,11 @@ const handleChangePassword = async () => {
         type: 'success',
         message: 'Profile updated successfully!',
       });
-
+      ToastAndroid.showWithGravity(
+        'Profile updated successfully',
+        ToastAndroid.SHORT,
+        ToastAndroid.BOTTOM
+      );
     } catch (error) {
       console.error('Error updating profile:', error);
       setMessageModal({
@@ -414,7 +426,7 @@ const handleChangePassword = async () => {
     </View>
   );
 
- 
+
 
   // Render account actions (change password, help, about)
   const renderAccountActions = () => (
@@ -438,8 +450,8 @@ const handleChangePassword = async () => {
           <Icon name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
         {/* About App */}
-        <TouchableOpacity style={styles.actionItem}             onPress={() => navigation.navigate('AboutScreen', { username })}
->
+        <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('AboutScreen', { username })}
+        >
           <View style={styles.actionInfo}>
             <Icon name="information-circle-outline" size={24} color="#6366f1" />
             <Text style={styles.actionTitle}>About App</Text>
@@ -658,7 +670,7 @@ const handleChangePassword = async () => {
                   justifyContent: 'center',
                   paddingHorizontal: 20,
                 }]}
-             onPress={handleChangePassword}
+                onPress={handleChangePassword}
 
               >
                 {loading ? (
@@ -716,6 +728,11 @@ const handleChangePassword = async () => {
                         index: 0,
                         routes: [{ name: 'Welcome' }],
                       });
+                      ToastAndroid.showWithGravity(
+                        'Log Out successful!',
+                        ToastAndroid.SHORT,
+                        ToastAndroid.BOTTOM
+                      );
 
                     }, 1500);
                   } catch (err) {

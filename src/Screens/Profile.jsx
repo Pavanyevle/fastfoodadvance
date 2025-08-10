@@ -9,6 +9,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Modal,
+  ToastAndroid,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import Chat from './Chat'
@@ -152,6 +153,11 @@ const fetchNotificationCount = async (uname) => {
           index: 0,
           routes: [{ name: 'Welcome' }],
         });
+         ToastAndroid.showWithGravity(
+          'Account Sign Out successfully!',
+          ToastAndroid.SHORT,
+          ToastAndroid.BOTTOM
+        );
       }, 1000); // Delay for smooth UX
     } catch (error) {
       console.error('Sign out error:', error);
